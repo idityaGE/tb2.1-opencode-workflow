@@ -133,8 +133,16 @@ def canonical_reward_tail_start(lines: list[str]) -> int | None:
 
 
 def has_canonical_reward_tail(text: str) -> bool:
-    lines = [line.strip() for line in text.strip().splitlines()]
+    lines = significant_lines(text)
     return canonical_reward_tail_start(lines) is not None
+
+
+def significant_lines(text: str) -> list[str]:
+    return [
+        line.strip()
+        for line in text.strip().splitlines()
+        if line.strip() and not line.strip().startswith("#")
+    ]
 
 
 def previous_significant_line(lines: list[str], before_index: int) -> str:
@@ -147,26 +155,32 @@ def previous_significant_line(lines: list[str], before_index: int) -> str:
 def check_test_runner(path: Path) -> None:
     text = path.read_text(errors="replace")
     lines = [line.strip() for line in text.strip().splitlines()]
-    meaningful_lines = [line for line in lines if line]
-    if "pytest" not in text:
-        fail(f"{path}: must run Python pytest directly")
+    sig_lines = significant_lines(text)
+    if not lines or lines[0] != "#!/bin/bash":
+        fail(f"{path}: must start with `#!/bin/bash`")
+    if "python -m pytest" not in text:
+        fail(f"{path}: must run Python pytest directly with `python -m pytest`")
+    if "--ctrf /logs/verifier/ctrf.json" not in text:
+        fail(f"{path}: pytest command must write CTRF output to /logs/verifier/ctrf.json")
     set_index = next(
-        (index for index, line in enumerate(meaningful_lines) if re.fullmatch(r"set\s+-uo\s+pipefail", line)),
+        (index for index, line in enumerate(sig_lines) if re.fullmatch(r"set\s+-uo\s+pipefail", line)),
         None,
     )
     if set_index is None:
         fail(f"{path}: must include `set -uo pipefail`")
     working_directory_guard = [
         'if [ "$PWD" = "/" ]; then',
-        'echo "Error: No working directory set."',
-        "exit 1",
+        'echo "Error: No working directory set. Please set a WORKDIR in your Dockerfile before running this script."',
+        "mkdir -p /logs/verifier",
+        "echo 0 > /logs/verifier/reward.txt",
+        "exit 0",
         "fi",
     ]
     guard_index = next(
         (
             index
-            for index in range(len(meaningful_lines) - len(working_directory_guard) + 1)
-            if meaningful_lines[index : index + len(working_directory_guard)] == working_directory_guard
+            for index in range(len(sig_lines) - len(working_directory_guard) + 1)
+            if sig_lines[index : index + len(working_directory_guard)] == working_directory_guard
         ),
         None,
     )
@@ -174,14 +188,21 @@ def check_test_runner(path: Path) -> None:
         fail(f"{path}: must include the canonical root working-directory guard")
     elif set_index is not None and guard_index != set_index + 1:
         fail(f"{path}: root working-directory guard must immediately follow `set -uo pipefail`")
-    tail_start = canonical_reward_tail_start(lines)
+    pytest_index = next((index for index, line in enumerate(sig_lines) if "python -m pytest" in line), None)
+    if pytest_index is not None and guard_index is not None:
+        after_guard = guard_index + len(working_directory_guard)
+        if "mkdir -p /logs/verifier" not in sig_lines[after_guard:pytest_index]:
+            fail(f"{path}: must create /logs/verifier before running pytest")
+    elif "mkdir -p /logs/verifier" not in sig_lines:
+        fail(f"{path}: must create /logs/verifier before running pytest")
+    tail_start = canonical_reward_tail_start(sig_lines)
     if tail_start is None:
         fail(
             f"{path}: Must end with the reward section using either `if [ $? -eq 0 ]; then` "
             "or `<var>=$?` followed by `if [ \"$<var>\" -eq 0 ]; then`, with no trailing lines"
         )
     else:
-        status_source = previous_significant_line(lines, tail_start)
+        status_source = previous_significant_line(sig_lines, tail_start)
         if "pytest" not in status_source:
             fail(f"{path}: pytest exit status must be captured immediately before the reward block")
         if re.search(r"\|\|\s*(true|:|exit\s+0)\b", status_source):
@@ -191,10 +212,28 @@ def check_test_runner(path: Path) -> None:
             fail(f"{path}:{line_no}: do not use `set +e`; use `set -uo pipefail` and capture pytest status")
         if re.match(r"\s*set\s+-[^\s#;]*e", line) or re.match(r"\s*set\s+-o\s+errexit\b", line):
             fail(f"{path}:{line_no}: do not enable errexit in test.sh; it can skip reward.txt on pytest failure")
-    banned = ["pip install", "uvx ", "curl ", "wget ", "git clone", "npm install"]
+    banned = ["uvx ", "curl ", "wget ", "git clone", "npm install", "apt-get install"]
     for token in banned:
         if token in text:
             fail(f"{path}: runtime verifier setup contains banned network/install token {token!r}")
+    for line_no, line in enumerate(text.splitlines(), start=1):
+        if "pip install" in line and "--no-index" not in line:
+            fail(f"{path}:{line_no}: runtime pip installs must be local-only with --no-index")
+    native_runner_patterns = [
+        r"\bgo\s+test\b",
+        r"\bnpm\s+test\b",
+        r"\bnpx\s+jest\b",
+        r"\bjest\b",
+        r"\bmvn\s+test\b",
+        r"\bgradle\s+test\b",
+        r"\bJUnitCore\b",
+    ]
+    for line in sig_lines:
+        if "python -m pytest" in line:
+            continue
+        for pattern in native_runner_patterns:
+            if re.search(pattern, line):
+                fail(f"{path}: run Python pytest directly instead of a native test runner in test.sh")
     tail = "\n".join(line.strip() for line in text.strip().splitlines()[-3:])
     if "exit $?" in tail or re.search(r"exit\s+\$rc", tail):
         fail(f"{path}: do not force an exit after the reward block")

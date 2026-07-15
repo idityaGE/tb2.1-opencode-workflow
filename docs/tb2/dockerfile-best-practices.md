@@ -248,7 +248,7 @@ All tasks must operate correctly without network access during the agent run and
 **Requirements:**
 - `tmux` and `asciinema` **must** be installed — the agent runtime requires both to start a session. Missing either will cause all agent runs to fail with no verifier output.
 - All package downloads happen at image build time
-- `test.sh` must not use `curl`, `wget`, `pip install`, `npm install`, `cargo fetch`, `mvn dependency:get`, or similar networked operations
+- `test.sh` must not use `curl`, `wget`, networked `pip install`, `npm install`, `cargo fetch`, `mvn dependency:get`, or similar networked operations
 - Python wheels, npm packages, Maven artifacts, Cargo registry state, reference binaries, and fixtures must be preloaded during build
 - `task.toml` must set `allow_internet = false`
 - The Oracle agent must pass with network access disabled

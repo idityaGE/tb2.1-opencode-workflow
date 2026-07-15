@@ -197,11 +197,19 @@ The verifier tests themselves must always be Python pytest tests. For non-Python
 
 ```bash
 #!/bin/bash
+set -uo pipefail
 
-# All test dependencies must be pre-installed in the Dockerfile.
-# test.sh must not install packages or fetch from the network at runtime (allow_internet = false).
+# Check if we're in a valid working directory
+if [ "$PWD" = "/" ]; then
+    echo "Error: No working directory set. Please set a WORKDIR in your Dockerfile before running this script."
+    mkdir -p /logs/verifier
+    echo 0 > /logs/verifier/reward.txt
+    exit 0
+fi
 
-# Run tests
+mkdir -p /logs/verifier
+
+# pytest and pytest-json-ctrf must be pre-installed in the Docker image.
 python -m pytest --ctrf /logs/verifier/ctrf.json /tests/test_outputs.py -rA
 rc=$?
 
@@ -213,17 +221,14 @@ else
 fi
 ```
 
-**Reward file formats:**
-- `/logs/verifier/reward.txt` - Plain text (e.g., `1` for success, `0` for failure)
-- `/logs/verifier/reward.json` - JSON with multiple metrics: `{ "runtime_sec": 1.23, "accuracy": 0.95 }`
-
-Harbor reads `reward.txt` by default and falls back to `reward.json`.
+**Reward file format:**
+- `/logs/verifier/reward.txt` - Plain text (`1` for success, `0` for failure)
 
 > **On the reward block and exit codes:** The `if [ $? -eq 0 ] ... fi` reward block is the **canonical end of `test.sh`**. No trailing `exit` statement is required or desired. Harbor reads `/logs/verifier/reward.txt` to determine pass/fail — **not** the script's exit code — so a failing pytest run correctly writes `0` via the `else` branch even though the script itself exits `0`. Reviewers must **not** flag a missing trailing `exit` as a defect, and the `check_test_sh` static gate enforces this exact shape (adding `exit $?` after `fi` will fail CI).
 
 **Key principles:**
 - **Must produce reward file** - This is how Harbor determines success/failure
-- **Always write the reward file** - Including when tests fail or a step errors; the verifier must not finish without `reward.txt` (or `reward.json`). Failed tests should still result in a written reward (typically `0`), not a missing file
+- **Always write the reward file** - Including when tests fail or a step errors; the verifier must not finish without `reward.txt`. Failed tests should still result in a written reward (`0`), not a missing file
 - **Use absolute paths** - Recommended to avoid relative path issues
 - **Python pytest only** - The verifier assertions live in `tests/test_outputs.py` or milestone `test_mN.py`
 - **Can include dependencies** - Other files in `tests/` folder are allowed
@@ -277,7 +282,7 @@ Before submission, verify:
 - [ ] All test/verifier dependencies are pre-installed in the Dockerfile (no runtime installs in `test.sh`)
 - [ ] Tests are written in Python and run with pytest
 - [ ] Solution demonstrates command sequence (if provided)
-- [ ] `tests/test.sh` always produces `/logs/verifier/reward.txt` or `/logs/verifier/reward.json` (including on test failure or error)
+- [ ] `tests/test.sh` always produces `/logs/verifier/reward.txt` (including on test failure or error)
 - [ ] All behavior in `instruction.md` has corresponding tests
 - [ ] All behavior in tests is described in `instruction.md`
 - [ ] No solution/test files copied in Dockerfile

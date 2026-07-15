@@ -196,12 +196,22 @@ exec "$@"
 **Cause 2: `set -euo pipefail` causes early exit.**
 If any command fails before writing `reward.txt`, the script exits. Drop `-e` and capture the exit code. Pytest and any plugins should be pre-installed in the Docker image; `test.sh` should only run the verifier and write the reward file (see [Writing Tests](/portal/docs/creating-tasks/writing-tests)):
 ```bash
+#!/bin/bash
 set -uo pipefail
+
+if [ "$PWD" = "/" ]; then
+    echo "Error: No working directory set. Please set a WORKDIR in your Dockerfile before running this script."
+    mkdir -p /logs/verifier
+    echo 0 > /logs/verifier/reward.txt
+    exit 0
+fi
+
 mkdir -p /logs/verifier
 
-python -m pytest --ctrf /logs/verifier/ctrf.json /tests/test_m1.py -rA && rc=0 || rc=$?
+python -m pytest --ctrf /logs/verifier/ctrf.json /tests/test_m1.py -rA
+rc=$?
 
-if [ $rc -eq 0 ]; then
+if [ "$rc" -eq 0 ]; then
   echo 1 > /logs/verifier/reward.txt
 else
   echo 0 > /logs/verifier/reward.txt
@@ -209,7 +219,7 @@ fi
 ```
 
 **Cause 3: Missing output directory.**
-Add `mkdir -p /logs/verifier` near the top of `test.sh`. The starter template may not include this line — add it yourself.
+Add `mkdir -p /logs/verifier` before running pytest, and keep the root-directory guard writing reward `0` when `$PWD` is `/`.
 
 **The quality check flags `source "$HOME/.local/bin/env"` as a typo.**
 Known false positive — ignore it.

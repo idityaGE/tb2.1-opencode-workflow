@@ -100,7 +100,7 @@ A Docker setting that gives containers root-level access. **Not allowed** in Ter
 ## R
 
 ### tests/test.sh
-Script that executes the Python pytest tests to verify task completion. Must set up the pytest command using uv and produce a reward file (`/logs/verifier/reward.txt` or `/logs/verifier/reward.json`). It should not delegate verification to another language-specific test framework.
+Script that executes the Python pytest tests to verify task completion. It runs `python -m pytest --ctrf /logs/verifier/ctrf.json ...` and produces `/logs/verifier/reward.txt`. It should not delegate verification to another language-specific test framework.
 
 ### Ruff
 A fast Python linter. All Python code in tasks must pass Ruff checks.

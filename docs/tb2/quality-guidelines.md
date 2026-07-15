@@ -156,9 +156,10 @@ RUN mkdir -p /oracle
 
 ```bash
 # ✅ Good - Always writes reward file
-python -m pytest /tests/test_outputs.py -rA
+python -m pytest --ctrf /logs/verifier/ctrf.json /tests/test_outputs.py -rA
+rc=$?
 
-if [ $? -eq 0 ]; then
+if [ "$rc" -eq 0 ]; then
   echo 1 > /logs/verifier/reward.txt
 else
   echo 0 > /logs/verifier/reward.txt
@@ -169,7 +170,7 @@ fi
 
 ```bash
 # ❌ Bad - Exits before writing reward file
-python -m pytest /tests/test_outputs.py -rA
+python -m pytest --ctrf /logs/verifier/ctrf.json /tests/test_outputs.py -rA
 
 exit_code=$?
 
@@ -219,7 +220,7 @@ pytest ${TEST_DIR:-/tests}/test_outputs.py -rA
 
 ```bash
 # ✅ Good - Hardcoded path (also acceptable)
-pytest /tests/test_outputs.py -rA
+python -m pytest --ctrf /logs/verifier/ctrf.json /tests/test_outputs.py -rA
 ```
 
 **Bad examples:**
