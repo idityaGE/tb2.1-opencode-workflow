@@ -80,6 +80,14 @@ Update-only feedback scripts:
 - `bash -n .opencode/scripts/*.sh` after shell edits.
 - `python3 -m py_compile .opencode/scripts/*.py` after Python edits.
 
+## Workflow Git History
+
+- `.opencode` is its own git repo for workflow history.
+- After validation passes, inspect status, diff, and recent log with `git -C .opencode ...`.
+- Stage only intended workflow files.
+- Commit every completed workflow update with a multi-line message that includes `Issue:`, `Changed:`, and `Validation:`.
+- Do not commit blocked or empty updates, and do not push.
+
 ## Final Response
 
-Use the maintainer agent's final response shape and include a short `Details` list explaining what changed in each touched workflow file and why.
+Use the maintainer agent's final response shape and include a short `Details` list explaining what changed in each touched workflow file and why. Include the workflow git commit hash when a commit was created.

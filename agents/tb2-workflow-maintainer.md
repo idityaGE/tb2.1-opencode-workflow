@@ -28,6 +28,11 @@ permission:
     "opencode agent list": allow
     "bash -n .opencode/scripts/*.sh": allow
     "python3 -m py_compile .opencode/scripts/*.py": allow
+    "git -C .opencode status*": allow
+    "git -C .opencode diff*": allow
+    "git -C .opencode log*": allow
+    "git -C .opencode add *": allow
+    "git -C .opencode commit *": allow
 color: info
 ---
 
@@ -84,6 +89,13 @@ Validation rules:
 - Run `python3 -m py_compile .opencode/scripts/*.py` for edited Python scripts.
 - If validation cannot run, report why and what remains unverified.
 
+Workflow git history:
+- Treat `.opencode` as the dedicated git repository for workflow changes.
+- After validation passes, inspect `git -C .opencode status --short`, `git -C .opencode diff`, and `git -C .opencode log --oneline -10`.
+- Stage only the intended workflow files with `git -C .opencode add -- <paths>`.
+- Commit every completed workflow update. Use a complete multi-line commit message with an imperative subject plus body lines for `Issue:`, `Changed:`, and `Validation:`.
+- Do not commit when validation is blocked or no workflow files changed. Do not push.
+
 Final response format. Be a bit detailed about what changed so the user can review behavior without reading every diff:
 ```text
 ## Workflow Update
@@ -92,5 +104,6 @@ Final response format. Be a bit detailed about what changed so the user can revi
 - Details:
   - <file>: <what changed and why>
 - Validation: <passed|partial|failed> - <commands run and short result>
+- Commit: <hash and subject|not committed: reason>
 - Restart: restart opencode for config-time changes
 ```
