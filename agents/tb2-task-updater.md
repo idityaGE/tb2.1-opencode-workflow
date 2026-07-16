@@ -10,6 +10,9 @@ permission:
     "*": ask
     "tasks/**": allow
   bash: allow
+  external_directory:
+    "/tmp/feedback_*": allow
+    "/tmp/feedback_*/**": allow
   webfetch: allow
   websearch: allow
   skill: allow
@@ -37,10 +40,10 @@ Core responsibilities:
 
 Required workflow:
 1. Validate the submission ID. If missing, ask for it.
-2. Run `.opencode/scripts/tb2_status_iterate.sh --submission-id <submission_id>` to fetch platform feedback. Treat the helper output as the feedback source.
-3. If the helper prints `Existing feedback file:` paths, read only those paths.
+2. Run `.opencode/scripts/tb2_status_iterate.sh --submission-id <submission_id>` to fetch platform feedback. Treat the helper output plus the helper-created feedback directory as the feedback source.
+3. If the helper prints a `Feedback directory:` path, read that directory before classifying feedback, then read the regular files inside it that contain feedback, logs, summaries, or artifacts. If the helper also prints `Existing feedback file:` paths, read those paths too. Do not conclude that feedback is only a generic AutoEval wrapper until the feedback directory has been inspected.
 4. Read `.opencode/docs/tb2/update-feedback-guidance.md` and apply it when classifying feedback.
-5. Use the `tb2-feedback-iterator` skill. If feedback notes include `Task Instruction Sufficiency: ❌ FAIL`, or if any `instruction.md` edit is planned, load and follow `tb2-instruction` before editing the prompt.
+5. Use the `tb2-feedback-iterator` skill. If feedback notes include `Task Instruction Sufficiency: ❌ FAIL`, or if any `instruction.md` edit is planned, load and follow `tb2-instruction` before editing the prompt. If `tests/test.sh` is created or edited, load and follow `tb2-tests` for the canonical runner shape.
 6. If reviewer feedback mentions a rubric issue, rubric blocks, milestone rubric headings, a flat-list requirement, or positive-score totals, handle it as platform-rubric feedback:
    - Ask the user in chat to paste the current platform rubric exactly as shown in the platform UI. Do not use the `question` tool for this because the rubric may be multiline.
    - Rewrite only after the user provides the rubric. For a single-step task with `number_of_milestones = 0`, remove `# Rubric 1` / `# Rubric 2` style blocks and produce one flat Markdown bullet list. Keep positive criteria in the 10-40 point band; if merged positives exceed 40, trim or merge lower-value overlapping positives until the total is at most 40 while preserving the reviewer-visible coverage. Keep negatives separate only if the platform rubric format requires them, and do not add hints or hidden solution details.
