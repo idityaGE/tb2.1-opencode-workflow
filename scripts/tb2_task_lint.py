@@ -137,6 +137,10 @@ def has_canonical_reward_tail(text: str) -> bool:
     return canonical_reward_tail_start(lines) is not None
 
 
+def physical_lines(text: str) -> list[str]:
+    return [line.strip() for line in text.splitlines()]
+
+
 def significant_lines(text: str) -> list[str]:
     return [
         line.strip()
@@ -200,6 +204,11 @@ def check_test_runner(path: Path) -> None:
         fail(
             f"{path}: Must end with the reward section using either `if [ $? -eq 0 ]; then` "
             "or `<var>=$?` followed by `if [ \"$<var>\" -eq 0 ]; then`, with no trailing lines"
+        )
+    elif canonical_reward_tail_start(physical_lines(text)) is None:
+        fail(
+            f"{path}: reward block must be the physical end of test.sh; do not add "
+            "trailing comments, blank lines, logging, cleanup, or exit commands after `fi`"
         )
     else:
         status_source = previous_significant_line(sig_lines, tail_start)

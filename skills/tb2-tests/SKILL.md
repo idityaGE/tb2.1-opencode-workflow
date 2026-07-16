@@ -38,7 +38,7 @@ fi
 - Use `set -uo pipefail` in `tests/test.sh`. Do not use `set +e` or enable `errexit` with `set -e`, because the structural gate rejects those forms.
 - Every regular or milestone `tests/test.sh` must include the working-directory guard shown above so the verifier writes reward `0` instead of running from `/`.
 - The pytest command whose result is being scored must be the last meaningful command before the reward block, or before the `<var>=$?` capture line. Do not add `|| true`, `exit`, logging commands, cleanup, or another command between pytest status and reward capture.
-- End `tests/test.sh` with one of these reward blocks and no trailing lines:
+- End `tests/test.sh` with one of these reward blocks as the literal physical end of the file. The final line must be `fi`; do not add trailing comments, blank lines, logging, cleanup, or `exit` commands after it:
 ```sh
 if [ $? -eq 0 ]; then
     echo 1 > /logs/verifier/reward.txt
