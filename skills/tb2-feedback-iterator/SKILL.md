@@ -9,9 +9,8 @@ Use after platform or CI feedback is available, especially from `/update-task <s
 
 Workflow:
 - Fetch feedback with `.opencode/scripts/tb2_status_iterate.sh --submission-id <submission_id>`. This helper runs `stb submissions feedback <submission_id>` and prints the feedback output.
-- If the helper prints a `Feedback directory:` path, read that directory before classifying feedback, then read the regular files inside it that contain feedback, logs, summaries, or artifacts. If the helper also prints `Existing feedback file:` paths, read those paths too.
+- If the helper prints a `Feedback directory:` path, inspect that directory before classifying feedback or ignoring generic AutoEval wrapper text.
 - Use `.opencode/docs/tb2/update-feedback-guidance.md` as the source of truth for ignore/focus rules before classifying feedback.
-- Do not treat a generic AutoEval build wrapper as the whole result until the feedback directory has been inspected for concrete reviewer, CI, NOP/oracle, or artifact details.
 - Summarize concrete failures before editing.
 - If feedback is about the platform rubric, ask the user to paste the current platform rubric before rewriting it. For single-step tasks with zero milestones, convert `# Rubric 1` / `# Rubric 2` blocks into one flat Markdown bullet list. Keep positive points between 10 and 40 total; when merged positives exceed 40, trim or merge overlapping lower-value positives until the total is at most 40.
 - After rewriting a platform rubric, copy the revised rubric to the clipboard with `wl-copy`. If this is the only concrete issue, do not run `stb submissions update`; tell the user to paste the copied rubric into the platform.

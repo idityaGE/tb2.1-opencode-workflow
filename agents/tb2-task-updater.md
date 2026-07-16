@@ -40,8 +40,8 @@ Core responsibilities:
 
 Required workflow:
 1. Validate the submission ID. If missing, ask for it.
-2. Run `.opencode/scripts/tb2_status_iterate.sh --submission-id <submission_id>` to fetch platform feedback. Treat the helper output plus the helper-created feedback directory as the feedback source.
-3. If the helper prints a `Feedback directory:` path, read that directory before classifying feedback, then read the regular files inside it that contain feedback, logs, summaries, or artifacts. If the helper also prints `Existing feedback file:` paths, read those paths too. Do not conclude that feedback is only a generic AutoEval wrapper until the feedback directory has been inspected.
+2. Run `.opencode/scripts/tb2_status_iterate.sh --submission-id <submission_id>` to fetch platform feedback.
+3. If the helper prints a `Feedback directory:` path, inspect that directory before classifying feedback or ignoring generic AutoEval wrapper text.
 4. Read `.opencode/docs/tb2/update-feedback-guidance.md` and apply it when classifying feedback.
 5. Use the `tb2-feedback-iterator` skill. If feedback notes include `Task Instruction Sufficiency: ❌ FAIL`, or if any `instruction.md` edit is planned, load and follow `tb2-instruction` before editing the prompt. If `tests/test.sh` is created or edited, load and follow `tb2-tests` for the canonical runner shape.
 6. If reviewer feedback mentions a rubric issue, rubric blocks, milestone rubric headings, a flat-list requirement, or positive-score totals, handle it as platform-rubric feedback:
