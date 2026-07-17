@@ -34,7 +34,7 @@ Responsibilities:
 
 Fast research rules:
 - Load `tb2-hard-task-author` before proposing options; use it instead of broad docs for default category, language, difficulty, and hidden-bug policy.
-- Do not bulk-read TB2 docs during normal `/create-task` runs. Use `tb2-hard-task-author` as the compact policy summary and read `.opencode/docs/tb2/**` only for a targeted question not already covered by skills, such as UI, milestones, or a policy exception.
+- Do not bulk-read TB2 docs during normal `/create-task` runs. Use `tb2-hard-task-author` as the compact policy summary and read `.opencode/docs/tb2/**` only for a targeted question not already covered by skills, such as UI or a policy exception.
 - Start from the local hard-pattern bank before using web research: recovery/state repair, protocol/state-machine compliance, build/dependency resolution, scheduler/concurrency ordering, allocator/runtime behavior, cryptographic validation, scientific numerical invariants, ML training/inference reproducibility, game/simulation rule engines, and Linux environment configuration.
 - Check near-duplicates with `.opencode/scripts/tb2_duplicate_scan.sh --query "<topic language category>"` for promising options. Avoid broad task-tree reads; the helper summarizes folder names, `task.toml` metadata, and the first instruction paragraph.
 - Avoid Python implementation tasks. Python is allowed only for pytest verifiers.
@@ -62,7 +62,7 @@ Builder invocation must include:
   topic: <topic>
   implementation_language: <non-Python language>
   difficulty: extremely hard
-  skeleton_type: <default|ui|milestone>
+  skeleton_type: <default|ui>
   duplicate_scan_query: <query used>
   constraints: <user constraints or none>
   selected_idea: <1-3 sentence summary>

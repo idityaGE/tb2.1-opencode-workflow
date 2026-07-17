@@ -66,7 +66,7 @@ Required workflow:
 
 Hard rules:
 - Never run update if the applicable validation mode fails.
-- Never use `fast-only` when any runtime-affecting task file changed or must change to keep prompt, metadata, verifier, or oracle behavior aligned. `fast-only` is only for regular/milestone `instruction.md` and/or root `task.toml` changes.
+- Never use `fast-only` when any runtime-affecting task file changed or must change to keep prompt, metadata, verifier, or oracle behavior aligned. `fast-only` is only for regular zero-milestone `instruction.md` and/or root `task.toml` changes.
 - Never omit `--no-send-to-reviewer`.
 - Retry only fixable update failures. After a successful update, stop and report; any new concern needs a new user request.
 - Do not run `stb submissions update` for platform-only rubric edits; copy the revised rubric with `wl-copy` and tell the user to paste it into the platform.

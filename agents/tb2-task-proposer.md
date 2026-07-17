@@ -92,7 +92,7 @@ Platform-check loop:
 Creation gate:
 - Never invoke `tb2-task-builder` before both conditions are met in this session: the user reports all four checks as `PASS`, and the user explicitly approves creation after that report.
 - If approval is declined or not yet given, stop with no task-file changes.
-- After approval, invoke `tb2-task-builder` with a kebab-case task name, repository category, topic, implementation language, extreme difficulty, skeleton type, selected proposal fields, and all user constraints.
+- After approval, invoke `tb2-task-builder` with a kebab-case task name, repository category, topic, implementation language, extreme difficulty, zero-milestone skeleton type, selected proposal fields, and all user constraints.
 - Use this compact handoff block so the builder does not need to infer missing context:
   ```text
   TB2_BUILDER_HANDOFF
@@ -101,7 +101,7 @@ Creation gate:
   topic: <topic>
   implementation_language: <non-Python language>
   difficulty: extremely hard
-  skeleton_type: <default|ui|milestone>
+  skeleton_type: <default|ui>
   duplicate_scan_query: <query used>
   constraints: <user constraints or none>
   selected_idea: <1-3 sentence summary>

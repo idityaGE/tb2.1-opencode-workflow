@@ -10,7 +10,7 @@ Use when creating or revising a Terminal-Bench 2 task.
 Defaults:
 - Destination: `tasks/<task-name>` from the repository root.
 - Visible workflow command: `/create-task`.
-- Skeleton: regular/default unless UI or milestones are explicitly required.
+- Skeleton: regular/default unless UI is explicitly required; this workflow keeps `number_of_milestones = 0`.
 - Implementation languages: any non-Python language. Python is only for pytest verifiers. Prefer Rust, C, C++, Go, Zig, Nim, Haskell, OCaml, Elixir/Erlang, Java/Kotlin/Scala, Ruby, Lua, Crystal, D, Racket, Fortran, Ada, or other non-Python languages when they fit the task.
 - Allowed categories for this repo: `system-administration`, `build-and-dependency-management`, `games`, `machine-learning`, `security`, or `scientific-computing`. Do not use `software-engineering`, `debugging`, or `data-processing`; local lint blocks them for this workflow.
 - Static validation may classify the task from `instruction.md` and other visible files. Make the primary activity genuinely match an allowed category; do not rely on `task.toml` alone to avoid blocked `software-engineering`, `debugging`, or `data-processing` predictions.
@@ -20,7 +20,7 @@ Defaults:
 Fast path:
 - Treat this skill plus the component skills as the default policy cache for `/create-task`.
 - Do not read broad TB2 docs unless a special case is not covered here or in a component skill.
-- Use targeted docs only for UI tasks, milestone layout, rubric/platform exceptions, unclear Docker/verifier policy, obscure language behavior, or authoritative external specs. Web research is allowed during authoring, but runtime solving and verification must remain offline; do not vendor solver-facing docs, specs, guides, manuals, READMEs, or reference excerpts into the task.
+- Use targeted docs only for UI tasks, rubric/platform exceptions, unclear Docker/verifier policy, obscure language behavior, or authoritative external specs. Web research is allowed during authoring, but runtime solving and verification must remain offline; do not vendor solver-facing docs, specs, guides, manuals, READMEs, or reference excerpts into the task.
 - For duplicate checks, inspect task names, `task.toml` metadata, and only the first paragraph of likely-similar instructions.
 
 Rotate across hard domains: numerical methods, crash-consistent storage, binary formats, concurrency, allocators, kernel-adjacent Linux behavior, protocol parsers, state-machine repair, build systems, VM/runtime behavior, and specification-heavy ecosystems.

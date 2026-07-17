@@ -1,6 +1,6 @@
 ---
 name: tb2-task-toml
-description: Write correct Terminal-Bench 2 task.toml metadata, including category, subcategories, languages, tags, runtime limits, milestones, and codebase_size based on environment file count.
+description: Write correct Terminal-Bench 2 task.toml metadata, including category, subcategories, languages, tags, runtime limits, required zero milestones, and codebase_size based on environment file count.
 ---
 
 # TB2 Task TOML
@@ -16,7 +16,7 @@ Requirements:
 - If none of the five allowed subcategories fits, leave the array empty with `subcategories = []`. Most systems/debugging/build tasks should leave it empty.
 - Do not list Python as a primary implementation language. Non-Python implementation languages are allowed when they match the task; Python may appear only for verifier/test tooling when necessary.
 - Set `allow_internet = false` unless the task type explicitly requires otherwise.
-- Set `number_of_milestones = 0` for regular tasks. For milestone tasks, read `.opencode/docs/tb2/milestones.md` instead of guessing the layout.
+- Always include `number_of_milestones = 0` in `[metadata]`; local lint blocks missing values and nonzero milestone counts.
 - Compute `codebase_size` from files under `environment/`: `minimal` for 0-20 files, `small` for more than 20, `large` for 200 or more.
 - Use 3-6 truthful tags for domain details. For tool/API/database subcategories, include the concrete tool, API framework, or database in tags.
 - Keep metadata truthful; do not overstate language, size, or domain.

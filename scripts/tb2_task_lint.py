@@ -406,7 +406,14 @@ def check_task(task: Path) -> int:
         if section not in config:
             fail(f"{config_path}: missing [{section}] section")
 
-    milestones = int(metadata.get("number_of_milestones", 0) or 0)
+    milestone_value = metadata.get("number_of_milestones")
+    if "number_of_milestones" not in metadata:
+        fail(f"{config_path}: Missing required field: .metadata.number_of_milestones")
+    elif not isinstance(milestone_value, int) or isinstance(milestone_value, bool):
+        fail(f"{config_path}: .metadata.number_of_milestones must be the integer 0")
+    elif milestone_value != 0:
+        fail(f"{config_path}: .metadata.number_of_milestones must be 0")
+    milestones = 0
     if milestones == 0:
         for section in ("agent", "verifier"):
             if section not in config:

@@ -34,7 +34,7 @@ fi
 ```
 - `tests/test.sh` must run Python pytest, normally `python -m pytest --ctrf /logs/verifier/ctrf.json /tests/test_outputs.py -rA`, and always write `/logs/verifier/reward.txt`. Use Python pytest tests to drive Java, JavaScript, Go, browser, or other systems instead of replacing pytest with their native test runners.
 - Use `set -uo pipefail` in `tests/test.sh`. Do not use `set +e` or enable `errexit` with `set -e`, because the structural gate rejects those forms.
-- Every regular or milestone `tests/test.sh` must include the working-directory guard shown above so the verifier writes reward `0` instead of running from `/`.
+- Every `tests/test.sh` must include the working-directory guard shown above so the verifier writes reward `0` instead of running from `/`.
 - The pytest command whose result is being scored must be immediately followed by `<var>=$?`, and that line must be immediately followed by the final reward `if` block.
 - End `tests/test.sh` with one of these reward blocks as the literal physical end of the file. The final physical line must be exactly `fi` with no trailing spaces; do not add trailing comments, blank lines, logging, cleanup, or `exit` commands after it:
 ```sh

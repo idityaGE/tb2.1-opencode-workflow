@@ -7,7 +7,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 usage() {
   cat <<'EOF'
-Usage: tb2_create_task.sh --task TASK_NAME [--template default|ui|milestone]
+Usage: tb2_create_task.sh --task TASK_NAME [--template default|ui]
 
 Creates a TB2 task skeleton under tasks/TASK_NAME with stb init.
 EOF
@@ -31,8 +31,9 @@ case "$task_name" in
 esac
 case "$template" in
   default|regular) template="default" ;;
-  ui|milestone) ;;
-  *) tb2_die "template must be default, ui, or milestone" ;;
+  ui) ;;
+  milestone) tb2_die "milestone templates are disabled; task.toml must use number_of_milestones = 0" ;;
+  *) tb2_die "template must be default or ui" ;;
 esac
 
 repo_root="$(tb2_repo_root)"
