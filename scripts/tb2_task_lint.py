@@ -277,10 +277,10 @@ def check_instruction_prompt(path: Path) -> None:
     if len(paragraphs) > 3:
         fail(f"{path}: instruction has {len(paragraphs)} paragraphs; use at most 3")
     words = len(text.split())
-    if words > 200:
-        fail(f"{path}: prompt is {words} words; it must stay at or below 200")
-    elif words > 175:
-        warn(f"{path}: prompt is {words} words; around 150 is preferred")
+    if words > 250:
+        fail(f"{path}: prompt is {words} words; it must stay at or below 250")
+    elif words > 200:
+        warn(f"{path}: prompt is {words} words; around 200 is preferred")
 
 
 def environment_file_count(task: Path) -> int:

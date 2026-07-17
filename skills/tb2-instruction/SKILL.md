@@ -8,7 +8,7 @@ description: Write concise, human-style Terminal-Bench instruction.md prompts wi
 Use when writing `instruction.md`.
 
 Requirements:
-- Keep the complete prompt at or below 200 words; prefer around 150. Use one sentence to at most three short prose paragraphs and remove anything the verifier does not need.
+- Keep the complete prompt at or below 250 words; prefer around 200. Use one sentence to at most three short prose paragraphs and remove anything the verifier does not need.
 - Write a natural one-shot request a person would give a coding agent. Do not use role-setting introductions, formal specification language, or long-running task framing.
 - Use plain prose, not a structured checklist or document. Do not use headings, bullets, numbered steps, tables, code fences, bold markers, hint sections, or emojis.
 - Use absolute paths for files and commands the agent must interact with.

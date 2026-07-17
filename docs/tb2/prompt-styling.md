@@ -25,7 +25,7 @@ Every `instruction.md` should adhere to these six general principles:
 
 ### 1. Task Instructions Must be Concise
 
-- Task instructions should be concise and clear. Keep the complete prompt at or below 200 words, preferably around 150, using as little as one sentence and at most three short paragraphs.
+- Task instructions should be concise and clear. Keep the complete prompt at or below 250 words, preferably around 200, using as little as one sentence and at most three short paragraphs.
 
 - Tasks should not be long running with many different instructions/requirements to follow.
 
@@ -69,7 +69,7 @@ To maintain authenticity, compare these two styles:
 | Feature | Synthetic (Avoid) | Human-Centric (Target) |
 | :--- | :--- | :--- |
 | **Tone** | "You are an expert programmer. Your goal is to..." | "We need to migrate the existing SQLite schema to..." |
-| **Length** | 500+ words of redundant context. | Around 150 words when possible and always at or below 200. |
+| **Length** | 500+ words of redundant context. | Around 200 words when possible and always at or below 250. |
 | **Guidance** | "First, use the `ls` command to see files, then..." | "The source data is in `/data`. Output the result to..." |
 
 ## Common Prompting Errors + Examples
