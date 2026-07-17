@@ -137,6 +137,10 @@ def has_canonical_reward_tail(text: str) -> bool:
     return canonical_reward_tail_start(lines) is not None
 
 
+def physical_lines(text: str) -> list[str]:
+    return [line.strip() for line in text.splitlines()]
+
+
 def significant_lines(text: str) -> list[str]:
     return [
         line.strip()
@@ -206,6 +210,11 @@ def check_test_runner(path: Path) -> None:
             f"{path}: reward block must be the physical end of test.sh and the final "
             "physical line must be exactly `fi`; do not add trailing spaces, comments, "
             "blank lines, logging, cleanup, or exit commands after it"
+        )
+    elif canonical_reward_tail_start(physical_lines(text)) is None:
+        fail(
+            f"{path}: pytest status capture and the final reward `if` block must be "
+            "adjacent at the physical end of test.sh"
         )
     else:
         status_source = previous_significant_line(sig_lines, tail_start)
