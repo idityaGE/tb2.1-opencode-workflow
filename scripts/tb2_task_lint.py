@@ -12,6 +12,7 @@ from pathlib import Path
 
 
 BLOCKED_CATEGORIES = {"software-engineering", "debugging", "data-processing"}
+ALLOWED_DIFFICULTIES = ("easy", "hard", "medium", "unknown")
 BLOCKED_INSTRUCTION_PATTERNS = {
     r"\bfix (?:the )?bugs?\b": "debugging/software-engineering",
     r"\bimplement missing logic\b": "software-engineering",
@@ -426,6 +427,14 @@ def check_task(task: Path) -> int:
             "use system-administration, build-and-dependency-management, "
             "games, machine-learning, security, or scientific-computing"
         )
+
+    if "difficulty" not in metadata:
+        fail(f"{config_path}: Missing required field: .metadata.difficulty")
+    else:
+        difficulty = metadata.get("difficulty")
+        if difficulty not in ALLOWED_DIFFICULTIES:
+            allowed = ", ".join(ALLOWED_DIFFICULTIES)
+            fail(f"{config_path}: Invalid difficulty {difficulty!r} (must be one of: {allowed})")
 
     subcategories = metadata.get("subcategories", [])
     if not isinstance(subcategories, list):

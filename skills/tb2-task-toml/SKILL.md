@@ -11,6 +11,7 @@ Requirements:
 - Use Edition 2 metadata: `version = "2.0"`, `[metadata]`, `[environment]`, and for regular tasks `[agent]` plus `[verifier]`.
 - `author_name` and `author_email` may be `anonymous`.
 - Match category, subcategories, languages, tags, timeouts, and difficulty to the actual task.
+- Set `difficulty` only to one of `easy`, `hard`, `medium`, or `unknown`. Use `hard` for this workflow's extremely hard task target; do not write `extremely hard` in `task.toml`.
 - Do not set `category` to `software-engineering`, `debugging`, or `data-processing`; this workflow blocks all three categories in local lint. Use one of the allowed project categories when truthful: `system-administration`, `build-and-dependency-management`, `games`, `machine-learning`, `security`, or `scientific-computing`.
 - `subcategories` must contain only these exact values: `api_integration`, `db_interaction`, `long_context`, `tool_specific`, `ui_building`. Values such as `binary-analysis`, `program-analysis`, `cryptography`, `protocols`, `compiler`, or language names are invalid; put those details in `tags` instead.
 - If none of the five allowed subcategories fits, leave the array empty with `subcategories = []`. Most systems/debugging/build tasks should leave it empty.
