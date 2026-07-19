@@ -42,8 +42,7 @@ Fast research rules:
 - Prefer tasks involving numerical methods, storage/recovery, binary formats, concurrency, allocators, kernel-adjacent Linux behavior, protocol parsers, state-machine repair, build systems, VM/runtime behavior, or specification-heavy domains.
 - Use targeted web research when it helps find model-resistant domains, language-specific pitfalls, recent tool behavior, or authoritative protocol/library docs. Use that research only while authoring and do not require live internet at solve or verifier runtime. Do not vendor source material or solver guides; follow `tb2-hard-task-author` for necessary realistic `environment/README.md`, `environment/spec.md`, or `environment/rule.md` documents while keeping `instruction.md` to the human prompt.
 - Each proposed task must be hard because the agent must discover and repair hidden layered bugs through multi-step investigation. Do not propose tasks with obvious bug locations or single-patch fixes.
-- Prefer categories allowed by project skills. Do not propose or select `software-engineering`, `debugging`, or `data-processing`; local workflow lint blocks those categories for new tasks.
-- Frame every option around an allowed primary activity, not generic code repair or file/data transformation. Avoid options whose visible `instruction.md` would naturally read as "fix bugs", "implement missing logic", "make tests pass", "repair the app", "parse files", "transform data", "aggregate records", or "convert datasets"; those tend to be classified as blocked `software-engineering`, `debugging`, or `data-processing` even when `task.toml` says otherwise.
+- Apply the `tb2-hard-task-author` primary-activity gate before presenting an option. Reject concepts dominated by blocked data processing, software engineering, or debugging even when they use an allowed domain; do not try to rescue them with wording or metadata changes.
 
 Question-tool format:
 - Present 3-5 single-select options.

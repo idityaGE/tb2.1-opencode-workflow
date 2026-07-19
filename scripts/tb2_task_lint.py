@@ -12,6 +12,14 @@ from pathlib import Path
 
 
 BLOCKED_CATEGORIES = {"software-engineering", "debugging", "data-processing"}
+ALLOWED_CATEGORIES = {
+    "system-administration",
+    "build-and-dependency-management",
+    "games",
+    "machine-learning",
+    "security",
+    "scientific-computing",
+}
 ALLOWED_DIFFICULTIES = ("easy", "hard", "medium", "unknown")
 BLOCKED_INSTRUCTION_PATTERNS = {
     r"\bfix (?:the )?bugs?\b": "debugging/software-engineering",
@@ -287,6 +295,17 @@ def check_instruction_prompt(path: Path) -> None:
         warn(f"{path}: prompt is {words} words; around 200 is preferred")
 
 
+def check_category(path: Path, category: str) -> None:
+    if category in BLOCKED_CATEGORIES:
+        fail(
+            f"{path}: category {category!r} is currently blocked; classify the task by its "
+            "truthful primary activity and redesign it if blocked work dominates"
+        )
+    elif category not in ALLOWED_CATEGORIES:
+        allowed = ", ".join(sorted(ALLOWED_CATEGORIES))
+        fail(f"{path}: category {category!r} is not an exact allowed category (use one of: {allowed})")
+
+
 def environment_file_count(task: Path) -> int:
     env = task / "environment"
     if not env.exists():
@@ -451,12 +470,7 @@ def check_task(task: Path) -> int:
                 fail(f"{config_path}: missing [{section}] section")
 
     category = str(metadata.get("category", ""))
-    if category in BLOCKED_CATEGORIES:
-        fail(
-            f"{config_path}: category {category!r} is blocked for this project; "
-            "use system-administration, build-and-dependency-management, "
-            "games, machine-learning, security, or scientific-computing"
-        )
+    check_category(config_path, category)
 
     if "difficulty" not in metadata:
         fail(f"{config_path}: Missing required field: .metadata.difficulty")

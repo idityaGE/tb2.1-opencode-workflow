@@ -25,6 +25,13 @@ Fast path:
 
 Rotate across hard domains: numerical methods, crash-consistent storage, binary formats, concurrency, allocators, kernel-adjacent Linux behavior, protocol parsers, state-machine repair, build systems, VM/runtime behavior, and specification-heavy ecosystems.
 
+Category selection gate:
+- Classify the task by its dominant agent-facing activity, final deliverable, and verifier outcome, not by the implementation language, libraries, subject-matter vocabulary, or presence of seeded defects.
+- Allowed primary activities are: configuring or bringing up an OS/service/network/environment (`system-administration`); compiling components, resolving dependencies, or producing a build artifact (`build-and-dependency-management`); achieving an outcome in a terminal game, puzzle, or simulation (`games`); training, inference, or model evaluation (`machine-learning`); cryptography, authentication, permissions, vulnerability validation, reverse engineering, or security configuration (`security`); and numerical computation, simulation, solver, or research workflows (`scientific-computing`). Use the exact lowercase metadata slug `security` even though the taxonomy heading is capitalized.
+- Reject `data-processing` when transforming, parsing, filtering, aggregating, or converting files/datasets is the primary result. Reject `software-engineering` when feature development, algorithm implementation, testing, optimization, or general code maintenance is primary. Reject `debugging` when identifying, diagnosing, and fixing errors is itself the primary request.
+- Seeded defects are compatible with an allowed task only when repairing them is incidental to achieving a genuinely allowed operational outcome. If the honest prompt or most verifier weight is still about fixing code, tests, or errors, reject or redesign the concept rather than relabeling it.
+- For mixed tasks, choose the category that accounts for the main user goal and most substantive verification. If a blocked activity dominates, the task is blocked even when an allowed domain appears in the background.
+
 Rules:
 - Tasks must be multi-step, standalone, novel, deterministic, and solvable by an expert human.
 - Avoid privileged operations, privileged containers, unsafe Docker capabilities, runtime human input, and live external dependencies.
@@ -33,7 +40,7 @@ Rules:
 - Do not include solution hints, bug locations, exact answer values, final outputs, or bug-signposting comments in user-visible files. Do not help the agent identify or solve the bugs in any way.
 - Default to no added documentation, but allow `environment/README.md` when realistic system context or user-facing interface documentation is genuinely needed, plus at most one of `environment/spec.md` or `environment/rule.md` when a declarative protocol, schema, or rule system would otherwise be ambiguous. Concrete reviewer feedback may explicitly request any of these files. Each file must be independently necessary; nearing the instruction word limit is not a reason to create one, and reviewer feedback waives only the necessity test, not the realism or no-hint rules. All other README variants, docs directories, guides, manuals, notes, walkthroughs, specs, and reference excerpts remain prohibited.
 - Avoid single-obvious-patch tasks; require multiple investigative steps and edge-case reasoning.
-- Avoid generic repair framing such as "fix bugs", "implement missing logic", "repair the app", or "make tests pass". Also avoid data-processing framing such as "parse files", "transform data", "aggregate records", "process datasets", or "convert logs". Use truthful allowed-category framing instead, such as enforcing security policy, resolving dependency graphs, restoring service/config behavior, simulating game state, running ML inference/training, or producing scientific-computing outputs.
+- Write the prompt around the truthful allowed-category outcome selected by the gate above. Do not insert category labels or euphemisms to disguise a blocked activity; category alignment must remain true when the prompt, environment, tests, and expected deliverable are read together.
 
 Sufficiency and difficulty guidance:
 - Make the task fully specified while making the implementation/debugging path genuinely deep.
