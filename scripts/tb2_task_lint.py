@@ -70,7 +70,9 @@ DOC_HELP_FILE_NAMES = {
     "walkthrough.txt",
 }
 DOC_HELP_SUFFIXES = {".adoc", ".md", ".rst"}
-ALLOWED_ENVIRONMENT_CONTRACTS = {"environment/spec.md", "environment/rule.md"}
+ALLOWED_ENVIRONMENT_READMES = {"environment/README.md"}
+ALLOWED_ENVIRONMENT_SPECS = {"environment/spec.md", "environment/rule.md"}
+ALLOWED_ENVIRONMENT_CONTRACTS = ALLOWED_ENVIRONMENT_READMES | ALLOWED_ENVIRONMENT_SPECS
 CANONICAL_IMAGES = {
     "public.ecr.aws/docker/library/python:3.13-slim-bookworm@sha256:01f42367a0a94ad4bc17111776fd66e3500c1d87c15bbd6055b7371d39c124fb",
     "public.ecr.aws/docker/library/node:22-bookworm-slim@sha256:f3a68cf41a855d227d1b0ab832bed9749469ef38cf4f58182fb8c893bc462383",
@@ -301,10 +303,11 @@ def expected_codebase_size(file_count: int) -> str:
 
 
 def check_no_solver_helper_docs(task: Path) -> None:
-    """Block helper docs while allowing one narrowly shaped environment contract."""
+    """Block helper docs while allowing narrowly shaped environment contracts."""
     contracts = [task / relative for relative in ALLOWED_ENVIRONMENT_CONTRACTS if (task / relative).exists()]
-    if len(contracts) > 1:
-        fail(f"{task}: use at most one environment contract: spec.md or rule.md")
+    specs = [task / relative for relative in ALLOWED_ENVIRONMENT_SPECS if (task / relative).exists()]
+    if len(specs) > 1:
+        fail(f"{task}: use at most one normative environment contract: spec.md or rule.md")
 
     for path in task.rglob("*"):
         if path.name == "instruction.md":
