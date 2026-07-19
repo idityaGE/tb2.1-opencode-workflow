@@ -12,8 +12,8 @@ Requirements:
 - `author_name` and `author_email` may be `anonymous`.
 - Match category, subcategories, languages, tags, timeouts, and difficulty to the actual task.
 - Set `difficulty` only to one of `easy`, `hard`, `medium`, or `unknown`. Use `hard` for this workflow's extremely hard task target; do not write `extremely hard` in `task.toml`.
-- Apply the primary-activity gate in `tb2-hard-task-author`, then set `category` to exactly one of `system-administration`, `build-and-dependency-management`, `games`, `machine-learning`, `security`, or `scientific-computing`. The exact metadata slug is lowercase `security`. Local lint rejects blocked `software-engineering`, `debugging`, and `data-processing` values plus unknown or mis-cased values.
-- Make `category` agree with the prompt's main objective, final artifact, environment, and dominant verifier behavior. Do not choose an allowed category merely because its domain, language, or library appears in a task whose primary activity is blocked.
+- Follow the centralized category policy in `tb2-hard-task-author`, then use the exact current taxonomy slug for the selected primary activity. Local lint derives accepted and blocked slugs from the taxonomy document.
+- Make `category` agree with the prompt, final artifact, environment, and dominant verifier behavior; never relabel a blocked primary activity.
 - `subcategories` must contain only these exact values: `api_integration`, `db_interaction`, `long_context`, `tool_specific`, `ui_building`. Values such as `binary-analysis`, `program-analysis`, `cryptography`, `protocols`, `compiler`, or language names are invalid; put those details in `tags` instead.
 - If none of the five allowed subcategories fits, leave the array empty with `subcategories = []`. Most system-administration and build tasks should leave it empty.
 - Do not list Python as a primary implementation language. Non-Python implementation languages are allowed when they match the task; Python may appear only for verifier/test tooling when necessary.

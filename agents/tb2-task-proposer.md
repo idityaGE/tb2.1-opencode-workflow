@@ -39,14 +39,14 @@ Research rules:
 - Propose only extremely hard, multi-step ideas with at least three interacting hidden defects or layered failure modes, including a non-local interaction and a non-happy-path edge case. Do not reveal bug locations or repair steps in the proposal.
 - Reject ideas that are single-patch, grep-and-fix, mostly prompt-following, hardcode-friendly, vague, unverifiable, near-duplicates, or difficult only because of instruction volume.
 - Avoid Python implementation tasks. Python remains allowed for pytest verifiers.
-- Apply the `tb2-hard-task-author` primary-activity gate and use only repository-allowed categories. Reject mixed ideas when blocked data processing, software engineering, or debugging is dominant; domain vocabulary alone does not establish category alignment. Map allowed slugs to platform labels as follows:
+- Follow the centralized `tb2-hard-task-author` taxonomy policy and use only categories the current source allows. The mapping below only translates accepted repository slugs to platform labels:
   - `system-administration`: `System / Environment Setup & Configuration`
   - `build-and-dependency-management`: `Build / Compilation / Dependency Management`
   - `machine-learning`: `Machine Learning / Model Training / Inference`
   - `security`: `Security / Cryptography / Vulnerability Demonstration`
   - `scientific-computing`: `Scientific Computing`
   - `games`: `Interactive / Simulation Tasks / Games`
-- Do not select or disguise any idea whose truthful repository category is `data-processing`, `software-engineering`, or `debugging`.
+- Do not select or disguise any idea whose truthful primary category is currently blocked by the taxonomy source.
 
 Selection step:
 - Use the `question` tool to present 3-5 single-select options.

@@ -11,15 +11,37 @@ import tomllib
 from pathlib import Path
 
 
-BLOCKED_CATEGORIES = {"software-engineering", "debugging", "data-processing"}
-ALLOWED_CATEGORIES = {
-    "system-administration",
-    "build-and-dependency-management",
-    "games",
-    "machine-learning",
-    "security",
-    "scientific-computing",
-}
+TAXONOMY_PATH = Path(__file__).resolve().parents[1] / "docs" / "tb2" / "task-taxonomy.md"
+
+
+def load_category_policy(path: Path) -> tuple[frozenset[str], frozenset[str]]:
+    """Derive exact category slugs and blocked status from the canonical taxonomy."""
+    text = path.read_text(errors="replace")
+    categories_match = re.search(
+        r"(?ms)^## Categories\s*$\n(.*?)^## Distribution Guidelines\s*$", text
+    )
+    if categories_match is None:
+        raise RuntimeError(f"could not parse category section from {path}")
+
+    allowed: set[str] = set()
+    blocked: set[str] = set()
+    for match in re.finditer(
+        r"(?ms)^###\s+([^\n]+?)\s*$\n(.*?)(?=^###\s+|\Z)", categories_match.group(1)
+    ):
+        slug = match.group(1).strip().lower()
+        if not re.fullmatch(r"[a-z][a-z0-9-]*", slug):
+            raise RuntimeError(f"invalid category heading {match.group(1)!r} in {path}")
+        if "currently blocked" in match.group(2).lower():
+            blocked.add(slug)
+        else:
+            allowed.add(slug)
+
+    if not allowed:
+        raise RuntimeError(f"no allowed categories found in {path}")
+    return frozenset(allowed), frozenset(blocked)
+
+
+ALLOWED_CATEGORIES, BLOCKED_CATEGORIES = load_category_policy(TAXONOMY_PATH)
 ALLOWED_DIFFICULTIES = ("easy", "hard", "medium", "unknown")
 BLOCKED_INSTRUCTION_PATTERNS = {
     r"\bfix (?:the )?bugs?\b": "debugging/software-engineering",

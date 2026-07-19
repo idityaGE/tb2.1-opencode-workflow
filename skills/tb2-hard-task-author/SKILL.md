@@ -12,8 +12,7 @@ Defaults:
 - Visible workflow command: `/create-task`.
 - Skeleton: regular/default unless UI is explicitly required; this workflow keeps `number_of_milestones = 0`.
 - Implementation languages: any non-Python language. Python is only for pytest verifiers. Prefer Rust, C, C++, Go, Zig, Nim, Haskell, OCaml, Elixir/Erlang, Java/Kotlin/Scala, Ruby, Lua, Crystal, D, Racket, Fortran, Ada, or other non-Python languages when they fit the task.
-- Allowed categories for this repo: `system-administration`, `build-and-dependency-management`, `games`, `machine-learning`, `security`, or `scientific-computing`. Do not use `software-engineering`, `debugging`, or `data-processing`; local lint blocks them for this workflow.
-- Static validation may classify the task from `instruction.md` and other visible files. Make the primary activity genuinely match an allowed category; do not rely on `task.toml` alone to avoid blocked `software-engineering`, `debugging`, or `data-processing` predictions.
+- Category source of truth: `.opencode/docs/tb2/task-taxonomy.md`. Read its current category descriptions, blocked notices, and `Choosing a Category` section before selecting or writing a task category; do not maintain a second prose list in agents or component skills.
 - Target difficulty: extremely hard. Hard means accuracy <= 20% on the best model or worst model. Tasks where the worst model scores above 80% are unacceptable.
 - Bug shape: multi-step, multi-level, hidden bugs or layered failure modes. Hidden means not signposted in prompts, code comments, fixture names, tests, or specs; all required behavior must still be fairly specified.
 
@@ -26,11 +25,8 @@ Fast path:
 Rotate across hard domains: numerical methods, crash-consistent storage, binary formats, concurrency, allocators, kernel-adjacent Linux behavior, protocol parsers, state-machine repair, build systems, VM/runtime behavior, and specification-heavy ecosystems.
 
 Category selection gate:
-- Classify the task by its dominant agent-facing activity, final deliverable, and verifier outcome, not by the implementation language, libraries, subject-matter vocabulary, or presence of seeded defects.
-- Allowed primary activities are: configuring or bringing up an OS/service/network/environment (`system-administration`); compiling components, resolving dependencies, or producing a build artifact (`build-and-dependency-management`); achieving an outcome in a terminal game, puzzle, or simulation (`games`); training, inference, or model evaluation (`machine-learning`); cryptography, authentication, permissions, vulnerability validation, reverse engineering, or security configuration (`security`); and numerical computation, simulation, solver, or research workflows (`scientific-computing`). Use the exact lowercase metadata slug `security` even though the taxonomy heading is capitalized.
-- Reject `data-processing` when transforming, parsing, filtering, aggregating, or converting files/datasets is the primary result. Reject `software-engineering` when feature development, algorithm implementation, testing, optimization, or general code maintenance is primary. Reject `debugging` when identifying, diagnosing, and fixing errors is itself the primary request.
-- Seeded defects are compatible with an allowed task only when repairing them is incidental to achieving a genuinely allowed operational outcome. If the honest prompt or most verifier weight is still about fixing code, tests, or errors, reject or redesign the concept rather than relabeling it.
-- For mixed tasks, choose the category that accounts for the main user goal and most substantive verification. If a blocked activity dominates, the task is blocked even when an allowed domain appears in the background.
+- Apply the taxonomy's primary-activity rule to the honest prompt, final deliverable, and dominant verifier behavior. Language, libraries, domain vocabulary, and seeded defects do not determine category by themselves.
+- If the taxonomy currently marks that primary activity as blocked, reject or redesign the concept. Never rescue it with metadata-only relabeling, allowed-domain vocabulary, or euphemistic prompt wording.
 
 Rules:
 - Tasks must be multi-step, standalone, novel, deterministic, and solvable by an expert human.
@@ -40,7 +36,7 @@ Rules:
 - Do not include solution hints, bug locations, exact answer values, final outputs, or bug-signposting comments in user-visible files. Do not help the agent identify or solve the bugs in any way.
 - Default to no added documentation, but allow `environment/README.md` when realistic system context or user-facing interface documentation is genuinely needed, plus at most one of `environment/spec.md` or `environment/rule.md` when a declarative protocol, schema, or rule system would otherwise be ambiguous. Concrete reviewer feedback may explicitly request any of these files. Each file must be independently necessary; nearing the instruction word limit is not a reason to create one, and reviewer feedback waives only the necessity test, not the realism or no-hint rules. All other README variants, docs directories, guides, manuals, notes, walkthroughs, specs, and reference excerpts remain prohibited.
 - Avoid single-obvious-patch tasks; require multiple investigative steps and edge-case reasoning.
-- Write the prompt around the truthful allowed-category outcome selected by the gate above. Do not insert category labels or euphemisms to disguise a blocked activity; category alignment must remain true when the prompt, environment, tests, and expected deliverable are read together.
+- Keep category alignment true when the prompt, environment, tests, and expected deliverable are read together; follow the taxonomy source rather than keyword substitution.
 
 Sufficiency and difficulty guidance:
 - Make the task fully specified while making the implementation/debugging path genuinely deep.
@@ -54,7 +50,7 @@ Sufficiency and difficulty guidance:
 - Minimize approved documents to the declarative information an engineer would genuinely inherit. They must not repeat the assignment, mirror test names/assertions, enumerate hidden failure layers, or remove the need to investigate the code. If fair documentation makes a seeded defect obvious, deepen or redesign that defect instead of hiding required behavior.
 - Add realistic codebase context and noise only when it is functional, not blank filler or obfuscation.
 - Favor domains frontier models often miss: crash recovery, binary parsers, protocol replay, state machines, concurrency ordering, undefined behavior, ownership/lifetime plus logic bugs, numerical stability, checkpoint/restart, allocator metadata, generated artifacts, and dependency/build resolution.
-- If Harbor/static validation emits `[category_classifier]` with blocked `software-engineering`, `debugging`, or `data-processing`, redesign the visible task concept and prompt around a genuinely allowed category. Do not merely rename the category in `task.toml` or use misleading instruction wording to disguise a blocked task.
+- If Harbor/static validation emits `[category_classifier]` with a category the taxonomy marks blocked, reread the source and redesign the actual primary activity. Do not merely rename `task.toml` or disguise the task with misleading wording.
 
 Red flags:
 - Vague prompts, hidden requirements only in tests, arbitrary gotchas, misleading comments, one obviously broken function, prompt text that points to a file or bug, fixture/test names that reveal the edge case, procedural README/docs/spec walkthroughs, unnecessary contract files, helper notes, giant instruction dumps, dead-file noise, runtime internet dependence, or static expected outputs that can be hardcoded.
