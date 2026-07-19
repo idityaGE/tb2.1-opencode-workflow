@@ -55,8 +55,11 @@ fi
 - Prefer the `rc=$?` capture form shown in the canonical runner for new tasks.
 - `tests/test_outputs.py` should use behavioral assertions, not implementation details.
 - Every test function should have a docstring.
-- Cover every explicit prompt requirement, reasonable implicit requirement, and important edge case.
+- Cover every explicit prompt requirement, every normative clause used from an approved `environment/spec.md` or `environment/rule.md`, fair unavoidable implicit behavior, and important edge case. If multiple reasonable outcomes exist, specify the chosen observable behavior before testing it rather than treating it as implicit.
 - If tests check an output file, schema, or protocol detail, make sure `instruction.md` mentions it fairly.
+- Before validation, run a private bidirectional requirement-to-test audit. Atomize independently violable obligations as `R1`, `R2`, and so on, and record each obligation's source, covering pytest functions, the assertion or independent-reference result that rejects a violation, input class, and one plausible violation probe. Execution alone, a broad end-to-end test, or file existence does not prove coverage unless the mapped assertion distinguishes compliant from non-compliant behavior.
+- Reverse-audit every semantically distinct verifier assertion to an explicit instruction requirement, approved contract clause, or truly unavoidable implicit behavior. If no basis exists, add the smallest neutral observable contract or remove the unfair assertion. A test is not grounded merely because it catches a seeded bug.
+- The audit passes only with zero uncovered requirements, zero ungrounded tested behaviors, coverage of every critical edge class, and verifier relevance for every intended hidden defect or failure layer. Re-run it after any instruction, approved contract, verifier, or oracle change. Keep the matrix private; do not upload it or leak requirement IDs through task files, test names, fixtures, or comments.
 - Preserve difficulty with behavioral depth rather than hidden requirements: use deterministic generated inputs, multiple fixtures, independent reference logic, invariant checks, replay/restart/order cases, and semantic validation when appropriate.
 - Do not encode solution hints or inspect forbidden implementation details.
 - Tests must be deterministic and must not fetch dependencies or data from the network.

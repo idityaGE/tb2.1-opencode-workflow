@@ -70,6 +70,7 @@ DOC_HELP_FILE_NAMES = {
     "walkthrough.txt",
 }
 DOC_HELP_SUFFIXES = {".adoc", ".md", ".rst"}
+ALLOWED_ENVIRONMENT_CONTRACTS = {"environment/spec.md", "environment/rule.md"}
 CANONICAL_IMAGES = {
     "public.ecr.aws/docker/library/python:3.13-slim-bookworm@sha256:01f42367a0a94ad4bc17111776fd66e3500c1d87c15bbd6055b7371d39c124fb",
     "public.ecr.aws/docker/library/node:22-bookworm-slim@sha256:f3a68cf41a855d227d1b0ab832bed9749469ef38cf4f58182fb8c893bc462383",
@@ -300,21 +301,47 @@ def expected_codebase_size(file_count: int) -> str:
 
 
 def check_no_solver_helper_docs(task: Path) -> None:
-    """Block docs/help artifacts that make seeded bugs easier to solve."""
+    """Block helper docs while allowing one narrowly shaped environment contract."""
+    contracts = [task / relative for relative in ALLOWED_ENVIRONMENT_CONTRACTS if (task / relative).exists()]
+    if len(contracts) > 1:
+        fail(f"{task}: use at most one environment contract: spec.md or rule.md")
+
     for path in task.rglob("*"):
         if path.name == "instruction.md":
             continue
-        if path.is_dir() and path.name.lower() in DOC_HELP_DIRS:
-            fail(f"{task}: helper documentation directory is not allowed: {path.relative_to(task)}")
+        relative = path.relative_to(task)
+        if relative.as_posix() in ALLOWED_ENVIRONMENT_CONTRACTS:
+            if path.is_symlink() or not path.is_file():
+                fail(f"{task}: environment contract must be a regular file: {relative}")
+            elif not path.read_text(errors="replace").strip():
+                fail(f"{task}: environment contract must not be empty: {relative}")
             continue
-        parts = {part.lower() for part in path.relative_to(task).parts[:-1]}
+        if path.is_dir() and path.name.lower() in DOC_HELP_DIRS:
+            fail(f"{task}: helper documentation directory is not allowed: {relative}")
+            continue
+        parts = {part.lower() for part in relative.parts[:-1]}
         if parts & DOC_HELP_DIRS:
-            fail(f"{task}: helper documentation directory is not allowed: {path.relative_to(task)}")
+            fail(f"{task}: helper documentation directory is not allowed: {relative}")
             continue
         if path.is_file():
             name = path.name.lower()
             if name in DOC_HELP_FILE_NAMES or path.suffix.lower() in DOC_HELP_SUFFIXES:
-                fail(f"{task}: helper documentation file is not allowed: {path.relative_to(task)}")
+                fail(f"{task}: helper documentation file is not allowed: {relative}")
+
+    for contract in contracts:
+        instruction = task / "instruction.md"
+        filename = re.escape(contract.name)
+        if not instruction.exists() or not re.search(
+            rf"/[A-Za-z0-9_.\-/]*{filename}\b", instruction.read_text(errors="replace")
+        ):
+            fail(
+                f"{task}: instruction.md must reference the environment contract "
+                f"by an absolute in-container path ending in {contract.name}"
+            )
+        warn(
+            f"{contract}: semantic review must confirm necessity or reviewer request, "
+            "declarative no-hint content, realistic style, instruction sufficiency, and test coverage"
+        )
 
 
 def check_dockerfile(path: Path) -> None:

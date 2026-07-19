@@ -18,8 +18,9 @@ Workflow:
 - Fix only issues supported by feedback.
 - Preserve extreme difficulty, layered hidden bugs, and no-hint/no-bug-signposting constraints.
 - Before editing any `instruction.md`, or whenever feedback notes include `Task Instruction Sufficiency: ❌ FAIL`, load the `tb2-instruction` skill and follow it while applying the fix.
-- Before creating or editing `tests/test.sh`, load the `tb2-tests` skill and use its canonical runner guidance.
+- Load `tb2-tests` when feedback concerns coverage or tested-but-undescribed behavior, or when `instruction.md`, an approved `environment/spec.md` or `environment/rule.md`, or any verifier file may change. Use its canonical runner guidance for `tests/test.sh` and complete its private bidirectional coverage audit before validation.
 - For instruction-sufficiency feedback, follow the updater agent's triviality-rescue path rather than adding hints.
+- Add at most one `environment/spec.md` or `environment/rule.md` only when the contract is genuinely necessary or concrete reviewer feedback explicitly requests it. Generic sufficiency feedback does not authorize one. Keep `instruction.md` independently sufficient and the contract declarative, realistic, and free of solution guidance.
 - Use `.opencode/scripts/tb2_task_state.sh --task tasks/<task_name> --write-cache` before and after edits to get changed files and validation mode.
 - If mode is `fast-only`, run `.opencode/scripts/tb2_preflight_task.sh --task tasks/<task_name>` and check prompt/metadata alignment. If runtime files changed, use `full`.
 - If mode is `full`, run `.opencode/scripts/tb2_validate_task.sh --task tasks/<task_name>` until structural lint passes, NOP fails as required, and oracle passes.
