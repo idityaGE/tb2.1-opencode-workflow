@@ -11,7 +11,7 @@ Requirements:
 - Make the script executable, deterministic, and idempotent. Prefer `#!/bin/bash` with `set -euo pipefail` when practical.
 - Derive the fix through commands such as edits, builds, generators, or repair tools.
 - Do not hardcode final verifier outputs, answer files, or reward files.
-- Do not depend on network access at runtime. Avoid wall-clock time, unseeded randomness, and host-specific state.
+- Match runtime network use to `allow_internet`: use none when false, and only the task's genuine need when true. Avoid wall-clock time, unseeded randomness, unstable external results, and host-specific state.
 - Helper files under `solution/` are allowed when they make the command-derived repair clearer.
 - Keep it understandable enough to audit.
 - It must pass the same tests used for agents.

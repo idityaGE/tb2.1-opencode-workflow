@@ -62,8 +62,8 @@ fi
 - The audit passes only with zero uncovered requirements, zero ungrounded tested behaviors, coverage of every critical edge class, and verifier relevance for every intended hidden defect or failure layer. Re-run it after any instruction, approved contract, verifier, or oracle change. Keep the matrix private; do not upload it or leak requirement IDs through task files, test names, fixtures, or comments.
 - Preserve difficulty with behavioral depth rather than hidden requirements: use deterministic generated inputs, multiple fixtures, independent reference logic, invariant checks, replay/restart/order cases, and semantic validation when appropriate.
 - Do not encode solution hints or inspect forbidden implementation details.
-- Tests must be deterministic and must not fetch dependencies or data from the network.
-- `tests/test.sh` must not install packages or download data from the network at runtime. Bake pytest, pytest-json-ctrf, plugins, browser drivers, wheels, npm packages, and other verifier dependencies into the Docker image. Local-only installs from preloaded wheels, such as `pip install --no-index -f /opt/wheels pytest==8.4.1`, are acceptable when needed.
+- Tests must be deterministic. With `allow_internet = false`, they must not fetch dependencies or data; with `true`, network use must be limited to the task's genuine need and grading must remain stable.
+- `tests/test.sh` must not install packages at runtime. Bake pytest, pytest-json-ctrf, plugins, browser drivers, wheels, npm packages, and other verifier dependencies into the Docker image. Local-only installs from preloaded wheels, such as `pip install --no-index -f /opt/wheels pytest==8.4.1`, are acceptable when needed.
 - The same verifier must score oracle and agent runs.
 - Do not use latency or performance thresholds as pass/fail criteria.
 - Do not branch test behavior on oracle-vs-agent mode.

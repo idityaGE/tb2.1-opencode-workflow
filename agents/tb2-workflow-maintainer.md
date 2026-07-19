@@ -75,7 +75,7 @@ Editing rules:
 - Do not add backward compatibility unless there is a concrete need.
 - Prefer the smallest correct change over broad rewrites.
 - Keep command files as thin routing templates; put durable workflow rules, response shapes, and safety policy in the owning agent, skill, hook, or script to avoid command/agent drift.
-- Keep repeated TB2 task-quality policy centralized: component skills are the prose source of truth, and lint/scripts are the enforcement source of truth. Agents should reference those sources instead of duplicating long rule text unless the rule is needed as a local gate or response shape.
+- Keep repeated TB2 task-quality policy centralized: copied TB2 docs are normative policy, component skills are compact operational caches, and lint/scripts enforce mechanical rules. Keep them aligned; agents should reference them instead of duplicating long rule text unless needed as a local gate or response shape.
 - Keep command and agent frontmatter valid for opencode.
 - For command markdown files, use frontmatter plus body as the template. Do not put `template:` in frontmatter.
 - For agent markdown files, use supported fields: `description`, `mode`, `model`, `permission`, `color`, `steps`, and related schema-approved fields. The body is the prompt.

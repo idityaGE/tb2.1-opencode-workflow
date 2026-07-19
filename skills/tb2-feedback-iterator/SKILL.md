@@ -11,8 +11,9 @@ Workflow:
 - Fetch feedback with `.opencode/scripts/tb2_status_iterate.sh --submission-id <submission_id>`. This helper runs `stb submissions feedback <submission_id>` and prints the feedback output.
 - If the helper prints a `Feedback directory:` path, inspect that directory before classifying feedback or ignoring generic AutoEval wrapper text.
 - Use `.opencode/docs/tb2/update-feedback-guidance.md` as the source of truth for ignore/focus rules before classifying feedback.
+- Load `tb2-hard-task-author` and apply its targeted four-document policy check to each concrete feedback topic before classifying or editing.
 - Summarize concrete failures before editing.
-- If feedback is about the platform rubric, ask the user to paste the current platform rubric before rewriting it. For single-step tasks with zero milestones, convert `# Rubric 1` / `# Rubric 2` blocks into one flat Markdown bullet list. Keep positive points between 10 and 40 total; when merged positives exceed 40, trim or merge overlapping lower-value positives until the total is at most 40.
+- If feedback is about the platform rubric, ask the user to paste the current platform rubric before rewriting it. For single-step tasks with zero milestones, convert `# Rubric 1` / `# Rubric 2` blocks into one flat list. Preserve the reviewer-required negative criteria; every criterion line must use `Agent …, ±N`, with `N` limited to 1, 2, 3, or 5 and an explicit `+` on positive scores. Keep positive points between 10 and 40 total; when merged positives exceed 40, trim or merge overlapping lower-value positives until the total is at most 40.
 - After rewriting a platform rubric, copy the revised rubric to the clipboard with `wl-copy`. If this is the only concrete issue, do not run `stb submissions update`; tell the user to paste the copied rubric into the platform.
 - Locate the matching local task under `tasks/`; ask only if it cannot be inferred.
 - Fix only issues supported by feedback.

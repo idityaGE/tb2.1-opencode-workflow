@@ -37,10 +37,9 @@ Fast research rules:
 - Do not bulk-read TB2 docs during normal `/create-task` runs. Use `tb2-hard-task-author` as the compact policy summary and read `.opencode/docs/tb2/**` only for a targeted question not already covered by skills, such as UI or a policy exception.
 - Start from the local hard-pattern bank before using web research: recovery/state repair, protocol/state-machine compliance, build/dependency resolution, scheduler/concurrency ordering, allocator/runtime behavior, cryptographic validation, scientific numerical invariants, ML training/inference reproducibility, game/simulation rule engines, and Linux environment configuration.
 - Check near-duplicates with `.opencode/scripts/tb2_duplicate_scan.sh --query "<topic language category>"` for promising options. Avoid broad task-tree reads; the helper summarizes folder names, `task.toml` metadata, and the first instruction paragraph.
-- Avoid Python implementation tasks. Python is allowed only for pytest verifiers.
-- Any non-Python implementation language is allowed. Deliberately consider less-common ecosystems when they fit the topic, such as Zig, Nim, Haskell, OCaml, Elixir/Erlang, Java/Kotlin/Scala, Ruby, Lua, Crystal, D, Racket, Fortran, or Ada; do not use language rarity alone as fake difficulty.
+- Any implementation language is allowed when it fits the task; Python tasks must be hard, and Python used only by pytest verifiers does not count as the task language. Deliberately consider less-common ecosystems such as Zig, Nim, Haskell, OCaml, Elixir/Erlang, Java/Kotlin/Scala, Ruby, Lua, Crystal, D, Racket, Fortran, or Ada, but do not use language rarity alone as fake difficulty.
 - Prefer tasks involving numerical methods, storage/recovery, binary formats, concurrency, allocators, kernel-adjacent Linux behavior, protocol parsers, state-machine repair, build systems, VM/runtime behavior, or specification-heavy domains.
-- Use targeted web research when it helps find model-resistant domains, language-specific pitfalls, recent tool behavior, or authoritative protocol/library docs. Use that research only while authoring and do not require live internet at solve or verifier runtime. Do not vendor source material or solver guides; follow `tb2-hard-task-author` for necessary realistic `environment/README.md`, `environment/spec.md`, or `environment/rule.md` documents while keeping `instruction.md` to the human prompt.
+- Use targeted web research when it helps find model-resistant domains, language-specific pitfalls, recent tool behavior, or authoritative protocol/library docs. Follow `tb2-hard-task-author` for runtime-internet policy and necessary realistic `environment/README.md`, `environment/spec.md`, or `environment/rule.md` documents; do not vendor solver guides, and keep `instruction.md` to the human prompt.
 - Each proposed task must be hard because the agent must discover and repair hidden layered bugs through multi-step investigation. Do not propose tasks with obvious bug locations or single-patch fixes.
 - Apply the centralized `tb2-hard-task-author` category gate before presenting an option; reject anything the current taxonomy marks blocked.
 
@@ -59,7 +58,7 @@ Builder invocation must include:
   task_name: <kebab-case>
   category: <repository category>
   topic: <topic>
-  implementation_language: <non-Python language>
+  implementation_language: <language>
   difficulty: extremely hard
   skeleton_type: <default|ui>
   duplicate_scan_query: <query used>

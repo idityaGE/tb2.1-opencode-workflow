@@ -16,9 +16,10 @@ Requirements:
 - Make `category` agree with the prompt, final artifact, environment, and dominant verifier behavior; never relabel a blocked primary activity.
 - `subcategories` must contain only these exact values: `api_integration`, `db_interaction`, `long_context`, `tool_specific`, `ui_building`. Values such as `binary-analysis`, `program-analysis`, `cryptography`, `protocols`, `compiler`, or language names are invalid; put those details in `tags` instead.
 - If none of the five allowed subcategories fits, leave the array empty with `subcategories = []`. Most system-administration and build tasks should leave it empty.
-- Do not list Python as a primary implementation language. Non-Python implementation languages are allowed when they match the task; Python may appear only for verifier/test tooling when necessary.
-- Set `allow_internet = false` unless the task type explicitly requires otherwise.
+- List the actual implementation language. Include Python when it is the primary task/oracle work and require `difficulty = "hard"`; omit it when Python appears only in pytest verifier tooling.
+- Set `allow_internet = false` by default; use `true` only when the task genuinely requires runtime internet and deterministic solving and grading remain possible.
 - Always include `number_of_milestones = 0` in `[metadata]`; local lint blocks missing values and nonzero milestone counts.
-- Compute `codebase_size` from files under `environment/`: `minimal` for 0-20 files, `small` for more than 20, `large` for 200 or more.
+- Compute `codebase_size` from files under `environment/`, excluding `Dockerfile` and `docker-compose.yaml`/`.yml`: `minimal` for 0-19 files, `small` for 20-199, and `large` for 200 or more.
+- If `docker-compose.yaml`/`.yml` exists, set `custom_docker_compose = true`; also set `is_multi_container = true` only when the task actually uses multiple containers.
 - Use 3-6 truthful tags for domain details. For tool/API/database subcategories, include the concrete tool, API framework, or database in tags.
 - Keep metadata truthful; do not overstate language, size, or domain.

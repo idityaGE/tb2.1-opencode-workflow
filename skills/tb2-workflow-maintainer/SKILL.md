@@ -59,7 +59,7 @@ Update-only feedback scripts:
 - Read opencode docs and schema before changing command, agent, plugin, skill, permission, or config shapes.
 - Keep edits small and targeted.
 - Prefer deterministic script helpers over agent reasoning for mechanical repository facts such as changed-file lists, instruction word/paragraph counts, metadata summaries, duplicate scans, validation scope, and structural linting.
-- Keep repeated TB2 task-quality policy centralized: component skills are the prose source of truth, and lint/scripts are the enforcement source of truth. Agents should reference those sources instead of duplicating long rule text unless the rule is needed as a local gate or response shape.
+- Keep repeated TB2 task-quality policy centralized: copied TB2 docs are normative policy, component skills are compact operational caches, and lint/scripts enforce mechanical rules. Keep them aligned; agents should reference them instead of duplicating long rule text unless needed as a local gate or response shape.
 - Preserve the separation of responsibilities between orchestrator, builder, updater, maintainer, skills, plugin hooks, and scripts.
 - Preserve the core task-quality invariant: tasks must be extremely hard, multi-step, layered, and hidden-bug based without hints or bug-signposting comments; platform field answers must be humanized.
 

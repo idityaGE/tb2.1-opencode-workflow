@@ -332,13 +332,18 @@ def environment_file_count(task: Path) -> int:
     env = task / "environment"
     if not env.exists():
         return 0
-    return sum(1 for path in env.rglob("*") if path.is_file())
+    excluded = {"Dockerfile", "docker-compose.yaml", "docker-compose.yml"}
+    return sum(
+        1
+        for path in env.rglob("*")
+        if path.is_file() and path.relative_to(env).as_posix() not in excluded
+    )
 
 
 def expected_codebase_size(file_count: int) -> str:
     if file_count >= 200:
         return "large"
-    if file_count > 20:
+    if file_count >= 20:
         return "small"
     return "minimal"
 
@@ -408,8 +413,8 @@ def check_dockerfile(path: Path) -> None:
     copy_leaks = re.findall(r"(?im)^\s*(COPY|ADD)\s+.*\b(tests|solution)\b", text)
     if copy_leaks:
         fail(f"{path}: Dockerfile must not copy tests/ or solution/")
-    if re.search(r"(?im)^\s*RUN\s+mkdir\s+-p\s+.*(/tests|/oracle)\b", text):
-        fail(f"{path}: Dockerfile must not create reserved /tests or /oracle directories")
+    if re.search(r"(?im)^\s*RUN\s+.*\b(?:mkdir|chown|chmod|install)\b.*(/tests|/solution|/oracle)\b", text):
+        fail(f"{path}: Dockerfile must not create or modify reserved /tests, /solution, or /oracle directories")
 
 
 def check_regular_task(task: Path) -> None:
@@ -512,15 +517,22 @@ def check_task(task: Path) -> int:
         fail(f"{config_path}: Invalid subcategories {invalid_subcategories!r} (must be one of: {allowed}; use [] if none fit)")
 
     languages = {str(lang).lower() for lang in metadata.get("languages", [])}
-    if "python" in languages:
-        fail(f"{config_path}: Python must not be listed as a primary task language")
+    if "python" in languages and metadata.get("difficulty") != "hard":
+        fail(f"{config_path}: Python implementation tasks must use difficulty = 'hard'")
 
     tags = metadata.get("tags", [])
     if not (3 <= len(tags) <= 6):
         warn(f"{config_path}: tags should contain 3-6 entries")
     env = config.get("environment", {})
-    if env.get("allow_internet") is not False:
-        fail(f"{config_path}: [environment].allow_internet must be false")
+    allow_internet = env.get("allow_internet")
+    if not isinstance(allow_internet, bool):
+        fail(f"{config_path}: [environment].allow_internet must be a boolean")
+    elif allow_internet:
+        warn(f"{config_path}: semantic review must confirm runtime internet is genuinely required and deterministic")
+
+    compose_paths = [task / "environment" / name for name in ("docker-compose.yaml", "docker-compose.yml")]
+    if any(path.exists() for path in compose_paths) and metadata.get("custom_docker_compose") is not True:
+        fail(f"{config_path}: docker-compose tasks must set custom_docker_compose = true in [metadata]")
 
     file_count = environment_file_count(task)
     expected_size = expected_codebase_size(file_count)

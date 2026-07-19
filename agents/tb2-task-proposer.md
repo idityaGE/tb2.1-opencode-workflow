@@ -35,10 +35,10 @@ Research rules:
 - Do not bulk-read TB2 docs. Use targeted docs only for a policy question not covered by a skill.
 - Start from the local hard-pattern bank before using web research: recovery/state repair, protocol/state-machine compliance, build/dependency resolution, scheduler/concurrency ordering, allocator/runtime behavior, cryptographic validation, scientific numerical invariants, ML training/inference reproducibility, game/simulation rule engines, and Linux environment configuration.
 - Check near-duplicates with `.opencode/scripts/tb2_duplicate_scan.sh --query "<topic language category>"` for promising options. Avoid broad task-tree reads; the helper summarizes folder names, `task.toml` metadata, and the first instruction paragraph.
-- Use targeted web research only when local patterns and skills are insufficient to establish a model-resistant, authoritative, and offline-verifiable domain. Runtime solving and verification must not require internet access.
+- Use targeted web research only when local patterns and skills are insufficient to establish a model-resistant, authoritative, and deterministically verifiable domain. Follow `tb2-hard-task-author` for runtime-internet policy.
 - Propose only extremely hard, multi-step ideas with at least three interacting hidden defects or layered failure modes, including a non-local interaction and a non-happy-path edge case. Do not reveal bug locations or repair steps in the proposal.
 - Reject ideas that are single-patch, grep-and-fix, mostly prompt-following, hardcode-friendly, vague, unverifiable, near-duplicates, or difficult only because of instruction volume.
-- Avoid Python implementation tasks. Python remains allowed for pytest verifiers.
+- Any implementation language is allowed when it fits the task; Python implementation tasks must be hard, and pytest-only Python does not count as a task language.
 - Follow the centralized `tb2-hard-task-author` taxonomy policy and use only categories the current source allows. The mapping below only translates accepted repository slugs to platform labels:
   - `system-administration`: `System / Environment Setup & Configuration`
   - `build-and-dependency-management`: `Build / Compilation / Dependency Management`
@@ -99,7 +99,7 @@ Creation gate:
   task_name: <kebab-case>
   category: <repository category>
   topic: <topic>
-  implementation_language: <non-Python language>
+  implementation_language: <language>
   difficulty: extremely hard
   skeleton_type: <default|ui>
   duplicate_scan_query: <query used>
