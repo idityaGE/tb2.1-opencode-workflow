@@ -1,6 +1,6 @@
 ---
 name: tb2-hard-task-author
-description: Design and author hard Terminal-Bench 2 tasks with concise instructions, deterministic oracle solutions, and pytest verifiers.
+description: Design and author medium or hard Terminal-Bench 2 tasks in non-Python implementation languages with concise instructions, deterministic oracle solutions, and pytest verifiers.
 ---
 
 # TB2 Hard Task Author
@@ -11,9 +11,9 @@ Defaults:
 - Destination: `tasks/<task-name>` from the repository root.
 - Visible workflow command: `/create-task`.
 - Skeleton: regular/default unless UI is explicitly required; this workflow keeps `number_of_milestones = 0`.
-- Implementation languages: any language that fits the task. Python implementation tasks must be `hard`; do not list Python when it appears only in pytest verifier tooling. Prefer language diversity rather than defaulting to Python.
+- Implementation languages: any non-Python language that fits the task. Python is allowed only for pytest verifier tooling and must not be listed as an implementation language.
 - Category source of truth: `.opencode/docs/tb2/task-taxonomy.md`. Read its current category descriptions, blocked notices, and `Choosing a Category` section before selecting or writing a task category; do not maintain a second prose list in agents or component skills.
-- Target difficulty: extremely hard. Hard means accuracy <= 20% on the best model or worst model. Tasks where the worst model scores above 80% are unacceptable.
+- Target difficulty: `medium` or `hard`, selected honestly from the documented pass-rate thresholds. Do not create easy, trivial, or unknown-difficulty tasks.
 - Bug shape: multi-step, multi-level, hidden bugs or layered failure modes. Hidden means not signposted in prompts, code comments, fixture names, tests, or specs; all required behavior must still be fairly specified.
 
 Fast path:

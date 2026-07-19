@@ -22,4 +22,4 @@ Requirements:
 - Use only the approved documents from `tb2-hard-task-author`: a necessary `environment/README.md` for realistic system context/interfaces and, when needed, one `environment/spec.md` or `environment/rule.md` for detailed normative behavior. `instruction.md` must reference each by absolute in-container path but should not repeat it. Generic instruction-sufficiency feedback does not itself authorize a new document; concrete reviewer requests do. Supporting documents must not restate the task assignment or contain repair steps, diagnostics, bug locations, suggested fixes, implementation order, seeded-case answers, known issues, common pitfalls, or test-shaped edge-case lists.
 - Check uniqueness with focused inspection of existing tasks; reject near-duplicates unless the initial state or expected output is materially different.
 - Run a humanizer pass before finalizing.
-- The prompt should be extremely hard because of multi-step engineering depth and hidden layered bugs, not because it is vague.
+- The prompt should meet its selected medium or hard rating through multi-step engineering depth and hidden layered bugs, not vagueness.

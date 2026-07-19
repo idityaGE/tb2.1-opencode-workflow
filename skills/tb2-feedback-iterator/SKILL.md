@@ -17,7 +17,7 @@ Workflow:
 - After rewriting a platform rubric, copy the revised rubric to the clipboard with `wl-copy`. If this is the only concrete issue, do not run `stb submissions update`; tell the user to paste the copied rubric into the platform.
 - Locate the matching local task under `tasks/`; ask only if it cannot be inferred.
 - Fix only issues supported by feedback.
-- Preserve extreme difficulty, layered hidden bugs, and no-hint/no-bug-signposting constraints.
+- Preserve the task's honest medium or hard difficulty, layered hidden bugs, non-Python implementation, and no-hint/no-bug-signposting constraints.
 - Before editing any `instruction.md`, or whenever feedback notes include `Task Instruction Sufficiency: ❌ FAIL`, load the `tb2-instruction` skill and follow it while applying the fix.
 - Load `tb2-tests` when feedback concerns coverage or tested-but-undescribed behavior, or when `instruction.md`, an approved `environment/README.md`, `environment/spec.md`, `environment/rule.md`, or any verifier file may change. Use its canonical runner guidance for `tests/test.sh` and complete its private bidirectional coverage audit before validation.
 - For instruction-sufficiency feedback, follow the updater agent's triviality-rescue path rather than adding hints.

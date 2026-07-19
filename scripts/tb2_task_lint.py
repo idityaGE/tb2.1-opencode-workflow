@@ -42,7 +42,7 @@ def load_category_policy(path: Path) -> tuple[frozenset[str], frozenset[str]]:
 
 
 ALLOWED_CATEGORIES, BLOCKED_CATEGORIES = load_category_policy(TAXONOMY_PATH)
-ALLOWED_DIFFICULTIES = ("easy", "hard", "medium", "unknown")
+ALLOWED_DIFFICULTIES = ("hard", "medium")
 BLOCKED_INSTRUCTION_PATTERNS = {
     r"\bfix (?:the )?bugs?\b": "debugging/software-engineering",
     r"\bimplement missing logic\b": "software-engineering",
@@ -517,8 +517,8 @@ def check_task(task: Path) -> int:
         fail(f"{config_path}: Invalid subcategories {invalid_subcategories!r} (must be one of: {allowed}; use [] if none fit)")
 
     languages = {str(lang).lower() for lang in metadata.get("languages", [])}
-    if "python" in languages and metadata.get("difficulty") != "hard":
-        fail(f"{config_path}: Python implementation tasks must use difficulty = 'hard'")
+    if "python" in languages:
+        fail(f"{config_path}: Python must not be listed as a primary task language")
 
     tags = metadata.get("tags", [])
     if not (3 <= len(tags) <= 6):

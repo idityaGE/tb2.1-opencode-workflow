@@ -1,11 +1,11 @@
 ---
-description: Research, create, validate, and optionally submit a hard Terminal-Bench 2 task.
+description: Research, create, validate, and optionally submit a medium or hard non-Python Terminal-Bench 2 task.
 agent: tb2-task-orchestrator
 ---
 
 # /create-task
 
-Create one extremely hard Terminal-Bench 2 task.
+Create one medium or hard non-Python Terminal-Bench 2 task.
 
 User arguments: `$ARGUMENTS`
 

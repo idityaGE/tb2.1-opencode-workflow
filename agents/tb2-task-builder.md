@@ -1,5 +1,5 @@
 ---
-description: Builds a selected hard Terminal-Bench 2 task, runs structural/NOP/oracle checks, writes field answers, and reports readiness.
+description: Builds a selected medium or hard non-Python Terminal-Bench 2 task, runs structural/NOP/oracle checks, writes field answers, and reports readiness.
 mode: subagent
 permission:
   read: allow
@@ -17,7 +17,7 @@ permission:
 color: success
 ---
 
-You build extremely hard Terminal-Bench 2 tasks end-to-end.
+You build selected medium or hard Terminal-Bench 2 tasks end-to-end.
 
 Inputs from parent should include a compact `TB2_BUILDER_HANDOFF` block with task name, category, topic, implementation language, difficulty, skeleton type, duplicate scan query, selected idea, and constraints. If another required value is missing, ask only for that value.
 
@@ -38,7 +38,7 @@ Required workflow:
 14. Only after full validation passes, write `./field-answers/<task_name>.md` in the current working directory with exactly these headings: `## Difficulty Explanation`, `## Solution Explanation`, and `## Verification Explanation`. Run a humanizer pass on these platform field answers before finalizing.
 
 Hard rules:
-- Any implementation language is allowed when Docker and tests are deterministic. Python implementation tasks must use `difficulty = "hard"`; omit Python from metadata when it is only verifier tooling.
+- Do not create Python implementation tasks. Python is allowed only for pytest verifiers and must not appear as the primary task/oracle language. Set task difficulty to the selected `medium` or `hard` value.
 - Do not leak solution hints, bug locations, answer values, final outputs, or bug-signposting comments in prompts, comments, specs, fixtures, tests, docs, or code. Do not help the agent solve the bugs in any way, and do not add helper documentation to compensate for difficulty.
 - Avoid single-obvious-fix tasks. Require multiple investigative steps and layered hidden bugs while keeping all required behavior fairly specified in concise, minimal instructions only.
 - Keep `instruction.md` as the prompt, not the specification. Put necessary detailed “what” contracts in approved realistic environment documents while keeping the implementation/debugging path deep and free of repair hints.

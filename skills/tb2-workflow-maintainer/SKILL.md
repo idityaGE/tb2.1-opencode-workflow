@@ -14,8 +14,8 @@ Primary opencode files:
 - `.opencode/commands/task-proposal.md`: user-facing proposal research, platform-check iteration, and approval-gated creation command.
 - `.opencode/commands/update-task.md`: user-facing submission feedback/update command.
 - `.opencode/commands/modify-workflow.md`: user-facing workflow modification command.
-- `.opencode/agents/tb2-task-orchestrator.md`: researches only extremely hard multi-step hidden-bug task options, asks the user, invokes builder, asks before submission.
-- `.opencode/agents/tb2-task-proposer.md`: researches hard proposals, prints platform fields, iterates on four proposal checks, and invokes builder only after all pass and the user approves.
+- `.opencode/agents/tb2-task-orchestrator.md`: researches only medium or hard non-Python multi-step hidden-bug task options, asks the user, invokes builder, asks before submission.
+- `.opencode/agents/tb2-task-proposer.md`: researches medium or hard non-Python proposals, prints platform fields, iterates on four proposal checks, and invokes builder only after all pass and the user approves.
 - `.opencode/agents/tb2-task-builder.md`: creates layered hidden-bug task files, uses component skills, validates structural/NOP/oracle behavior, writes humanized field answers.
 - `.opencode/agents/tb2-task-updater.md`: fetches submission feedback, fixes concrete task issues, uses fast structural/alignment/metadata checks for instruction.md and/or task.toml-only edits or full NOP/oracle validation for runtime-affecting edits, and updates without sending to reviewer.
 - `.opencode/agents/tb2-workflow-maintainer.md`: modifies workflow infrastructure.
@@ -42,13 +42,13 @@ Update-only feedback scripts:
 ## Flow
 
 1. User runs `/create-task`.
-2. `tb2-task-orchestrator` uses compact skill context plus focused existing-task inspection, presents only extremely hard multi-step hidden-bug options through `question`, then invokes `tb2-task-builder`.
+2. `tb2-task-orchestrator` uses compact skill context plus focused existing-task inspection, presents only medium or hard non-Python multi-step hidden-bug options through `question`, then invokes `tb2-task-builder`.
 3. `tb2-task-builder` initializes and authors the layered hidden-bug task, uses component skills instead of bulk doc reads, validates, and writes humanized field answers.
 4. Parent reports a compact result and asks before platform submission.
 5. `tb2-task-hooks.ts` runs fast post-edit structural checks on task-file modifications; full ruff/NOP/oracle validation stays in `tb2_validate_task.sh`.
 6. User runs `/update-task <submission_id>`.
 7. `tb2-task-updater` fetches feedback, summarizes issues, fixes the matching local task, uses structural/alignment/metadata checks without NOP/oracle for instruction.md and/or task.toml-only changes, otherwise validates structural/NOP/oracle behavior, and runs the update helper only after the applicable validation passes; the helper chooses a random 280-350 minute update time and uses `--no-send-to-reviewer`.
-8. `/task-proposal` researches and presents hard task options, emits proposal fields in chat, revises them from platform feedback until all four checks pass, then creates the selected task only after explicit user approval.
+8. `/task-proposal` researches and presents medium or hard non-Python task options, emits proposal fields in chat, revises them from platform feedback until all four checks pass, then creates the selected task only after explicit user approval.
 
 ## Safe Modification Rules
 
@@ -61,7 +61,7 @@ Update-only feedback scripts:
 - Prefer deterministic script helpers over agent reasoning for mechanical repository facts such as changed-file lists, instruction word/paragraph counts, metadata summaries, duplicate scans, validation scope, and structural linting.
 - Keep repeated TB2 task-quality policy centralized: copied TB2 docs are normative policy, component skills are compact operational caches, and lint/scripts enforce mechanical rules. Keep them aligned; agents should reference them instead of duplicating long rule text unless needed as a local gate or response shape.
 - Preserve the separation of responsibilities between orchestrator, builder, updater, maintainer, skills, plugin hooks, and scripts.
-- Preserve the core task-quality invariant: tasks must be extremely hard, multi-step, layered, and hidden-bug based without hints or bug-signposting comments; platform field answers must be humanized.
+- Preserve the core task-quality invariant: tasks must be medium or hard, non-Python, multi-step, layered, and hidden-bug based without hints or bug-signposting comments; platform field answers must be humanized.
 
 ## Syntax Reminders
 

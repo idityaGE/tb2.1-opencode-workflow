@@ -54,7 +54,7 @@ Workflow files:
 
 Current flow:
 1. `/create-task` sends the request to `tb2-task-orchestrator`.
-2. `tb2-task-orchestrator` reads docs and existing tasks, researches only extremely hard multi-step hidden-bug options, asks the user to choose via `question`, then invokes `tb2-task-builder`.
+2. `tb2-task-orchestrator` reads docs and existing tasks, researches only medium or hard non-Python multi-step hidden-bug options, asks the user to choose via `question`, then invokes `tb2-task-builder`.
 3. `tb2-task-builder` initializes a task, authors layered hidden bugs, uses TB2 component skills, runs validation, and writes humanized field answers.
 4. `tb2-task-hooks.ts` runs fast structural hooks after task edits; full ruff/NOP/oracle validation stays in `tb2_validate_task.sh`.
 5. The parent asks before `stb submissions create`.
