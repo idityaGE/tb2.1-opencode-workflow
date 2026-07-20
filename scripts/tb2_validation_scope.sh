@@ -10,9 +10,9 @@ usage() {
 Usage: tb2_validation_scope.sh --task TASK_DIR
 
 Classifies the current task-local change scope for update-task.
-Prints mode=fast-only or mode=full, plus the reason. fast-only requires a valid
-full-validation baseline and changes limited to instruction.md and/or allowlisted
-metadata-only task.toml keys, so NOP and oracle are not needed.
+Prints mode=fast-only or mode=full, plus the reason. fast-only means the
+changed task files are limited to instruction.md and/or task.toml, so NOP and
+oracle are not needed.
 EOF
 }
 
@@ -35,34 +35,11 @@ baseline_file="$repo_root/.opencode/cache/tb2-validation/$(basename "$task_path"
 cd "$repo_root"
 
 changed_files="$(git status --short -- "$task_rel" | while IFS= read -r line; do printf '%s\n' "${line#???}"; done)"
-
-if [ ! -f "$baseline_file" ]; then
-  printf 'mode=full\nreason=missing full-validation runtime baseline\n'
-  exit 0
-fi
-
-current_baseline="$(mktemp)"
-if ! tb2_emit_runtime_validation_baseline "$task_rel" > "$current_baseline"; then
-  rm -f "$current_baseline"
-  printf 'mode=full\nreason=could not parse task.toml runtime metadata for baseline comparison\n'
-  exit 0
-fi
-if ! cmp -s "$baseline_file" "$current_baseline"; then
-  rm -f "$current_baseline"
-  printf 'mode=full\nreason=runtime-affecting files differ from last full-validation baseline\n'
-  exit 0
-fi
-rm -f "$current_baseline"
-
 runtime_changed=""
 if [ -n "$changed_files" ]; then
   while IFS= read -r file_path; do
     [ -n "$file_path" ] || continue
-    if tb2_is_instruction_path "$file_path"; then
-      continue
-    elif tb2_is_task_toml_path "$file_path" && tb2_task_toml_metadata_change_only "$file_path"; then
-      continue
-    else
+    if ! tb2_is_fast_validation_path "$file_path"; then
       runtime_changed=1
       break
     fi
@@ -76,6 +53,23 @@ if [ -n "$runtime_changed" ]; then
   exit 0
 fi
 
+if [ -f "$baseline_file" ]; then
+  current_baseline="$(mktemp)"
+  git ls-files -co --exclude-standard -- "$task_rel" |
+    while IFS= read -r file_path; do
+      if ! tb2_is_fast_validation_path "$file_path"; then
+        printf '%s\0' "$file_path"
+      fi
+    done |
+    xargs -0 -r sha256sum > "$current_baseline"
+  if ! cmp -s "$baseline_file" "$current_baseline"; then
+    rm -f "$current_baseline"
+    printf 'mode=full\nreason=runtime-affecting files differ from last full-validation baseline\n'
+    exit 0
+  fi
+  rm -f "$current_baseline"
+fi
+
 if [ -n "$changed_files" ]; then
   instruction_changed=""
   task_toml_changed=""
@@ -83,16 +77,16 @@ if [ -n "$changed_files" ]; then
     [ -n "$file_path" ] || continue
     if tb2_is_instruction_path "$file_path"; then
       instruction_changed=1
-    elif tb2_is_task_toml_path "$file_path"; then
+    elif [ "${file_path#tasks/*/}" != "$file_path" ] && [ "${file_path##*/}" = "task.toml" ]; then
       task_toml_changed=1
     fi
   done <<EOF
 $changed_files
 EOF
   if [ -n "$instruction_changed" ] && [ -n "$task_toml_changed" ]; then
-    printf 'mode=fast-only\nreason=only instruction and metadata-only task.toml files changed\n'
+    printf 'mode=fast-only\nreason=only instruction and task.toml files changed\n'
   elif [ -n "$task_toml_changed" ]; then
-    printf 'mode=fast-only\nreason=only metadata-only task.toml changed\n'
+    printf 'mode=fast-only\nreason=only task.toml changed\n'
   else
     printf 'mode=fast-only\nreason=only instruction files changed\n'
   fi

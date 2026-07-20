@@ -59,7 +59,7 @@ Current flow:
 4. `tb2-task-hooks.ts` runs fast structural hooks after task edits; full ruff/NOP/oracle validation stays in `tb2_validate_task.sh`.
 5. The parent asks before `stb submissions create`.
 6. `/update-task <submission_id>` sends the request to `tb2-task-updater`.
-7. `tb2-task-updater` fetches feedback, fixes concrete issues, uses fast structural/alignment/metadata checks without NOP/oracle only when a valid full-validation runtime baseline exists and changes are limited to instruction.md and/or allowlisted metadata-only task.toml keys, otherwise runs full structural/NOP/oracle validation, and runs the update helper only after the applicable validation passes; the helper chooses a random 280-350 minute update time and uses `--no-send-to-reviewer`.
+7. `tb2-task-updater` fetches feedback, fixes concrete issues, uses fast structural/alignment/metadata checks without NOP/oracle for instruction.md and/or task.toml-only changes, otherwise runs full structural/NOP/oracle validation, and runs the update helper only after the applicable validation passes; the helper chooses a random 280-350 minute update time and uses `--no-send-to-reviewer`.
 8. `/task-proposal` sends the request to `tb2-task-proposer`, which researches medium or hard options while preferring hard when viable, prints the selected proposal fields in chat, iterates until the user reports all four platform checks pass, and invokes `tb2-task-builder` only after explicit approval.
 
 Before editing:

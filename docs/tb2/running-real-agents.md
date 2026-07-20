@@ -131,8 +131,8 @@ Ask yourself:
 ### Task Too Easy?
 
 - Add more steps
-- Add publicly specified edge cases and non-obvious interactions
-- Use specialized knowledge only when the required rules are public
+- Include hidden requirements
+- Use niche knowledge
 - Create debugging scenarios
 
 ### Task Too Hard?
@@ -140,6 +140,7 @@ Ask yourself:
 - Simplify requirements
 - Make instructions clearer
 - Reduce step count
+- Provide more hints
 
 ---
 

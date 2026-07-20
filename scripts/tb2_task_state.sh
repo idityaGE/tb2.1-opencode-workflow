@@ -60,7 +60,7 @@ emit_state() {
       file_path="${line#???}"
       if tb2_is_instruction_path "$file_path"; then
         kind="instruction"
-      elif tb2_is_task_toml_path "$file_path" && tb2_task_toml_metadata_change_only "$file_path"; then
+      elif tb2_is_fast_validation_path "$file_path"; then
         kind="metadata"
       else
         kind="runtime"

@@ -34,7 +34,7 @@ Core responsibilities:
 - Handle platform-only rubric feedback by rewriting the platform rubric for the user to paste back.
 - Locate the matching local task.
 - Fix all concrete issues while preserving task difficulty, sufficient instructions, and hidden-bug depth.
-- Validate according to changed-file scope before updating: fast structural/alignment or metadata checks without NOP/oracle are allowed only when a valid full-validation runtime baseline exists and changes are limited to instruction.md and/or allowlisted metadata-only task.toml keys; runtime-affecting task changes require full NOP/oracle validation.
+- Validate according to changed-file scope before updating: instruction.md and/or task.toml-only changes use fast structural/alignment or metadata checks without NOP/oracle; runtime-affecting task changes require full NOP/oracle validation.
 - Run `stb submissions update` with `--no-send-to-reviewer` only after upload prep and validation pass. After a successful update, stop and report.
 - Prefer deterministic scripts over manual token-heavy inspection whenever a helper exists. Use script output for feedback fetching, task state, changed-file classification, instruction length, validation scope, upload cleanup, random update time, and structural checks; reserve file reads for concrete reasoning and edits.
 
@@ -62,10 +62,12 @@ Required workflow:
 17. If mode is `full`, run `.opencode/scripts/tb2_validate_task.sh --task tasks/<task_name>` until structural lint passes, NOP fails as required, and oracle passes, or a concrete blocker remains.
 18. Do not choose update time manually; `.opencode/scripts/tb2_update_task.sh` selects a random multiple of 10 between 280 and 350 minutes.
 19. Update with `.opencode/scripts/tb2_update_task.sh --task tasks/<task_name> --submission-id <submission_id>` only after validation passes. The helper runs upload prep. If prep changes files, it stops before upload; validate again and rerun it. If update succeeds, stop and report. If it fails for a non-retryable reason, report the blocker.
+20. Before the final response, show a concise Markdown table with columns `Problem`, `How it was fixed`, `Files changed`, and `Reusable guidance?`.
+21. Ask the user whether to append a concise common-error entry to `.opencode/docs/tb2/update-feedback-guidance.md`. If they agree, add a short bullet under `## Common feedback patterns` using the shape `- Problem: ... Fix: ...`. If they decline, do not edit the guidance file. Skip the question only when there is no concrete reusable problem/fix pair, and say why in the final notes.
 
 Hard rules:
 - Never run update if the applicable validation mode fails.
-- Never use `fast-only` when the full-validation runtime baseline is missing or stale, when task.toml changes are outside the allowlisted metadata-only keys, or when any runtime-affecting task file changed or must change to keep prompt, metadata, verifier, or oracle behavior aligned.
+- Never use `fast-only` when any runtime-affecting task file changed or must change to keep prompt, metadata, verifier, or oracle behavior aligned. `fast-only` is only for regular zero-milestone `instruction.md` and/or root `task.toml` changes.
 - Never omit `--no-send-to-reviewer`.
 - Retry only fixable update failures. After a successful update, stop and report; any new concern needs a new user request.
 - Do not run `stb submissions update` for platform-only rubric edits; copy the revised rubric with `wl-copy` and tell the user to paste it into the platform.
@@ -73,6 +75,7 @@ Hard rules:
 - Do not modify unrelated tasks or workflow files.
 - Do not hide feedback issues; if something cannot be fixed, report the blocker.
 - Ignore generic AutoEval execution-failed wrapper lines and category-change warnings unless paired with concrete actionable evidence.
+- Do not add feedback-guidance entries without explicit user approval from the end-of-update question.
 
 Final response must be a bit detailed and use this shape:
 ```text
@@ -87,5 +90,6 @@ Final response must be a bit detailed and use this shape:
 - Validation: mode <fast-only|full>, structural <passed|blocked>, alignment <passed|blocked>, metadata <passed|not-applicable|blocked>, ruff <passed|skipped-fast-only|skipped-unavailable|blocked>, NOP <failed-as-required|skipped-fast-only|blocked>, oracle <passed|skipped-fast-only|blocked>
 - Rubric: <not applicable|rewritten and copied with wl-copy|copy blocked|waiting for user-provided platform rubric>
 - Update: <updated with reported time <minutes> --no-send-to-reviewer after <n> attempt(s)|not needed for platform-only rubric|blocked after <n> attempt(s): <reason>>
+- Feedback guidance: <added|declined|skipped> <path and short entry summary, if added>
 - Notes: <remaining blockers or reviewer-relevant details, or none>
 ```
