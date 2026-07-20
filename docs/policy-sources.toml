@@ -1,0 +1,97 @@
+[manifest]
+version = 1
+synchronized_on = "2026-07-20"
+upstream_root = "../../docs"
+copied_root = "tb2"
+local_root = "local"
+upstream_path_rule = "For copied entries, remove the leading tb2/ from the manifest path and append the remainder to upstream_root."
+overlay = "Copied text is preserved except that positive tests/test.sh bodies are replaced by references to .opencode/templates/tests/test.sh and insignificant trailing whitespace is normalized."
+
+[precedence]
+order = ["current-status", "local-operational", "normative", "advisory", "historical"]
+rule = "Current-status sources control dated availability. Local-operational policy may narrow but never relax current-status or normative requirements. Advisory and historical sources never override the first three classes."
+conflict_action = "Use the newer topic-specific source; if the conflict remains material, stop and ask instead of inventing policy."
+
+[[sources]]
+classification = "current-status"
+synchronized_on = "2026-07-20"
+upstream_root = "../../docs"
+files = [
+  "tb2/category-status.md",
+  "tb2/changelog.md",
+  "tb2/rate-schedule.md",
+]
+
+[[sources]]
+classification = "normative"
+synchronized_on = "2026-07-20"
+upstream_root = "../../docs"
+files = [
+  "tb2/creating-docker-environment.md",
+  "tb2/creating-task.md",
+  "tb2/difficulty-guidelines.md",
+  "tb2/diversity-requirements.md",
+  "tb2/dockerfile-best-practices.md",
+  "tb2/long-context-checklist.md",
+  "tb2/milestones.md",
+  "tb2/prompt-styling.md",
+  "tb2/quality-guidelines.md",
+  "tb2/reviewer-checklist.md",
+  "tb2/rubrics.md",
+  "tb2/running-real-agents.md",
+  "tb2/running-your-task.md",
+  "tb2/submission-checklist.md",
+  "tb2/task-components.md",
+  "tb2/task-requirements.md",
+  "tb2/task-subtypes.md",
+  "tb2/task-taxonomy.md",
+  "tb2/what-makes-a-good-task.md",
+  "tb2/writing-oracle-solution.md",
+  "tb2/writing-tests.md",
+]
+
+[[sources]]
+classification = "historical"
+synchronized_on = "2026-07-20"
+upstream_root = "../../docs"
+files = [
+  "tb2/edition1-to-edition2-changes.md",
+]
+
+[[sources]]
+classification = "advisory"
+synchronized_on = "2026-07-20"
+upstream_root = "../../docs"
+files = [
+  "tb2/after-submission.md",
+  "tb2/agent-review-reference.md",
+  "tb2/ci-checks-reference.md",
+  "tb2/ci-feedback-training.md",
+  "tb2/cli-user-guide.md",
+  "tb2/common-errors.md",
+  "tb2/defending-your-submission.md",
+  "tb2/example-tasks.md",
+  "tb2/external-resources.md",
+  "tb2/faq.md",
+  "tb2/glossary.md",
+  "tb2/llmaj-checks-reference.md",
+  "tb2/nop-agent.md",
+  "tb2/office-hours.md",
+  "tb2/oracle-agent.md",
+  "tb2/platform-onboarding.md",
+  "tb2/platform-submission.md",
+  "tb2/quick-start.md",
+  "tb2/review-guidelines.md",
+  "tb2/troubleshooting.md",
+  "tb2/welcome.md",
+]
+
+[[sources]]
+classification = "local-operational"
+synchronized_on = "not-applicable"
+upstream_root = "local"
+files = [
+  "local/instruction-authoring.md",
+  "local/update-feedback-guidance.md",
+  "local/workflow-profile.md",
+]

@@ -58,7 +58,7 @@ def main(argv: list[str]) -> int:
     print("\n## Next Actions")
     print("- Read only feedback files that exist; otherwise use tb2_status_iterate.sh stdout/stderr.")
     print("- Fix only concrete issues tied to feedback.")
-    print("- Re-run tb2_validate_task.sh before updating.")
+    print("- Use tb2_task_state.sh and the local workflow profile to run the applicable revision validation.")
     return 0
 
 

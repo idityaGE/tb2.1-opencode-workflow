@@ -18,7 +18,7 @@ Write `./field-answers/<task_name>.md` in the current working directory with exa
 ```
 
 Requirements:
-- Difficulty explanation should justify the selected medium or hard rating, including the multi-step and layered hidden-bug nature, without giving a solution walkthrough or hints.
+- Follow the selected rating from `.opencode/docs/local/workflow-profile.md`. Explain its multi-step and layered nature without giving a solution walkthrough or hints.
 - Solution explanation should summarize the oracle-level repair at a high level.
 - Verification explanation should describe behavioral checks and why NOP fails/oracle passes.
 - Copy a specific field with `.opencode/scripts/tb2_copy_field_answers.sh --file ./field-answers/<task_name>.md --section "Difficulty Explanation"` when clipboard is available. The helper does not pause for Enter.

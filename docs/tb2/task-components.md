@@ -103,7 +103,7 @@ build_timeout_sec = 600.0
 cpus = 2
 memory_mb = 4096
 storage_mb = 10240
-allow_internet = false
+allow_internet = false  # default — set true only if the task genuinely requires internet
 # workdir = "/app"  # Milestone tasks only — sets the working directory shared across all milestones
 ```
 
@@ -195,40 +195,19 @@ The verifier tests themselves must always be Python pytest tests. For non-Python
 
 **Critical:** The test script **must produce a reward file** in `/logs/verifier/`:
 
-```bash
-#!/bin/bash
-set -uo pipefail
+The local workflow generates the required body from `.opencode/templates/tests/test.sh`; copied component examples are not runner templates.
 
-# Check if we're in a valid working directory
-if [ "$PWD" = "/" ]; then
-    echo "Error: No working directory set. Please set a WORKDIR in your Dockerfile before running this script."
-    mkdir -p /logs/verifier
-    echo 0 > /logs/verifier/reward.txt
-    exit 0
-fi
+**Reward file formats:**
+- `/logs/verifier/reward.txt` - Plain text (e.g., `1` for success, `0` for failure)
+- `/logs/verifier/reward.json` - JSON with multiple metrics: `{ "runtime_sec": 1.23, "accuracy": 0.95 }`
 
-mkdir -p /logs/verifier
-
-# pytest and pytest-json-ctrf must be pre-installed in the Docker image.
-python -m pytest --ctrf /logs/verifier/ctrf.json /tests/test_outputs.py -rA
-rc=$?
-
-# Produce reward file (REQUIRED)
-if [ "$rc" -eq 0 ]; then
-  echo 1 > /logs/verifier/reward.txt
-else
-  echo 0 > /logs/verifier/reward.txt
-fi
-```
-
-**Reward file format:**
-- `/logs/verifier/reward.txt` - Plain text (`1` for success, `0` for failure)
+Harbor reads `reward.txt` by default and falls back to `reward.json`.
 
 > **On the reward block and exit codes:** The `if [ $? -eq 0 ] ... fi` reward block is the **canonical end of `test.sh`**. No trailing `exit` statement is required or desired. Harbor reads `/logs/verifier/reward.txt` to determine pass/fail — **not** the script's exit code — so a failing pytest run correctly writes `0` via the `else` branch even though the script itself exits `0`. Reviewers must **not** flag a missing trailing `exit` as a defect, and the `check_test_sh` static gate enforces this exact shape (adding `exit $?` after `fi` will fail CI).
 
 **Key principles:**
 - **Must produce reward file** - This is how Harbor determines success/failure
-- **Always write the reward file** - Including when tests fail or a step errors; the verifier must not finish without `reward.txt`. Failed tests should still result in a written reward (`0`), not a missing file
+- **Always write the reward file** - Including when tests fail or a step errors; the verifier must not finish without `reward.txt` (or `reward.json`). Failed tests should still result in a written reward (typically `0`), not a missing file
 - **Use absolute paths** - Recommended to avoid relative path issues
 - **Python pytest only** - The verifier assertions live in `tests/test_outputs.py` or milestone `test_mN.py`
 - **Can include dependencies** - Other files in `tests/` folder are allowed
@@ -278,11 +257,11 @@ Before submission, verify:
 - [ ] Every Docker base image is digest-pinned
 - [ ] Final runtime base image is sanctioned or explicitly exempt
 - [ ] `environment/` is at most 100 MiB total, with no file over 50 MiB
-- [ ] `allow_internet = false` is set in `task.toml` under `[environment]`
+- [ ] `allow_internet` is set correctly for the task — `false` (default) for offline-solvable tasks, `true` only when the task genuinely requires internet
 - [ ] All test/verifier dependencies are pre-installed in the Dockerfile (no runtime installs in `test.sh`)
 - [ ] Tests are written in Python and run with pytest
 - [ ] Solution demonstrates command sequence (if provided)
-- [ ] `tests/test.sh` always produces `/logs/verifier/reward.txt` (including on test failure or error)
+- [ ] `tests/test.sh` always produces `/logs/verifier/reward.txt` or `/logs/verifier/reward.json` (including on test failure or error)
 - [ ] All behavior in `instruction.md` has corresponding tests
 - [ ] All behavior in tests is described in `instruction.md`
 - [ ] No solution/test files copied in Dockerfile

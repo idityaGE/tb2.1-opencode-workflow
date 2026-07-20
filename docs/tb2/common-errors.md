@@ -200,7 +200,7 @@ RUN pip install pandas==2.0.0
 
 ### Runtime Network Installs in test.sh
 
-With `allow_internet = false`, `tests/test.sh` cannot fetch packages from the network at runtime. All verifier dependencies must be baked into the Docker image. A `test.sh` that runs `apt-get install`, `curl … install.sh`, `uvx`, `pip install`, `npm install`, `git clone`, or `wget` will succeed locally during development (where the network is available) and fail in production with `RewardNotFoundError`.
+With `allow_internet = false`, `tests/test.sh` cannot fetch packages from the network at runtime. All verifier dependencies must be baked into the Docker image. A `test.sh` that runs `apt-get install`, `curl … install.sh`, `uvx`, `pip install`, `npm install`, `git clone`, or `wget` will succeed locally during development (where the network is available) and fail in production with `RewardNotFoundError`. This applies to the default `allow_internet = false`; for `allow_internet = true` tasks that genuinely require the network, runtime network use is permitted — though bundling dependencies into the image is still preferred where possible for deterministic grading.
 
 ```bash
 # Bad - test.sh installs deps at runtime, fails with allow_internet = false
@@ -209,23 +209,7 @@ apt-get update && apt-get install -y curl
 curl -LsSf https://astral.sh/uv/0.9.5/install.sh | sh
 uvx -w pytest==8.4.1 pytest /tests/test_outputs.py -rA
 
-# Good - test.sh assumes deps already in image
-#!/bin/bash
-set -uo pipefail
-if [ "$PWD" = "/" ]; then
-    echo "Error: No working directory set. Please set a WORKDIR in your Dockerfile before running this script."
-    mkdir -p /logs/verifier
-    echo 0 > /logs/verifier/reward.txt
-    exit 0
-fi
-mkdir -p /logs/verifier
-python -m pytest --ctrf /logs/verifier/ctrf.json /tests/test_outputs.py -rA
-rc=$?
-if [ "$rc" -eq 0 ]; then
-  echo 1 > /logs/verifier/reward.txt
-else
-  echo 0 > /logs/verifier/reward.txt
-fi
+# Good - replace the runner with .opencode/templates/tests/test.sh
 ```
 
 And the corresponding `Dockerfile` line that makes this work:
@@ -359,7 +343,7 @@ FROM public.ecr.aws/docker/library/python:latest
 FROM public.ecr.aws/docker/library/python:3.13-slim-bookworm@sha256:<digest>
 ```
 
-> **Note:** For version-pinning issues specifically (pip/npm packages unpinned, base image tag missing the digest), the feedback category is `pinning`, not `environment`. The two are related but distinct.
+> **Note:** For version-pinning issues specifically (pip/npm packages unpinned, apt versions floating, base image tag missing the digest), the feedback category is `pinning`, not `environment`. The two are related but distinct.
 
 ## Cheating Opportunities
 

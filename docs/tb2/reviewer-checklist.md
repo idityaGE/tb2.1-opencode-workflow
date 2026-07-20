@@ -4,6 +4,8 @@
 
 | Date | Type | Change |
 |------|------|--------|
+| Jul 9, 2026 | 🆕 New | Clarified that `gpus`, `gpu_types`, and `docker_flags` in `[environment]` are valid but **optional** Harbor fields. Reviewers must **not** send a task back solely because these are omitted or left blank — TB2 tasks are not required to use GPU. Both the full and minimal `[environment]` blocks are acceptable. |
+| Jul 6, 2026 | 🆕 New | Added a High-severity Rubrics criterion: **positive scores must include an explicit `+` sign** (e.g., `+3`, not `3`). Rubrics with unsigned positive scores must be sent back for revision. |
 | Jun 12, 2026 | 🔄 Update | Replaced the "Final runtime base image is sanctioned or exempt" criterion with the new canonical-list criterion: *"Base image(s) are canonical for the task's language, or the non-canonical justification is present and credible."* Canonical image → passes; non-canonical with a credible justification → passes (surfaced to reviewer); non-canonical with missing or vague justification → blocked. (High severity) |
 | Jun 3, 2026 | 🔄 Update | Updated the Rubrics formatting criterion: milestone tasks must use `# Rubric 1`, `# Rubric 2`, etc. headers to delineate each milestone's block. Non-milestone tasks use a flat `Agent …` list; a single `# Rubric 1` header is tolerated but not required, and `# Rubric 2+` is reserved for milestone tasks. |
 | May 27, 2026 | 🆕 New | Added "Task environment does not contain hidden instructions or hints" criterion under Instruction Prompt (High severity). Environment files must not smuggle in step-by-step walkthroughs or solution hints. |
@@ -119,6 +121,11 @@ Each criterion is marked with a different severity level (high, medium, or low).
       <td>High</td>
     </tr>
     <tr>
+      <td><code>allow_internet</code> accurately matches the task's actual needs.</td>
+      <td>The <code>allow_internet</code> setting must reflect what the task genuinely requires. Use <code>false</code> (the default) for tasks fully solvable offline with the provided files, docs, dependencies, and environment. Use <code>true</code> only when the task genuinely requires internet — e.g., retrieving current/external information, interacting with web-based resources, or downloading an external model/resource that cannot reasonably be bundled. Do not set <code>true</code> for convenience or to make a task look more complex; an eval checks whether internet is actually required, so unjustified <code>true</code> tasks may be rejected.</td>
+      <td>High</td>
+    </tr>
+    <tr>
       <td>All dependencies use pinned versions</td>
       <td>Any dependencies installed must use pinned versions. This is only high severity for packages (excluding apt).</td>
       <td>High</td>
@@ -165,7 +172,7 @@ Each criterion is marked with a different severity level (high, medium, or low).
     </tr>
     <tr>
       <td>Apt usage is clean and reproducible</td>
-      <td>Use a single <code>apt-get update &amp;&amp; apt-get install -y --no-install-recommends ... &amp;&amp; rm -rf /var/lib/apt/lists/*</code> transaction per stage and avoid <code>apt-get upgrade</code>.</td>
+      <td>Use a single <code>apt-get update &amp;&amp; apt-get install -y --no-install-recommends ... &amp;&amp; rm -rf /var/lib/apt/lists/*</code> transaction per stage, avoid <code>apt-get upgrade</code>, and pin niche apt packages when version drift would affect behavior.</td>
       <td>Medium</td>
     </tr>
     <tr>
@@ -203,8 +210,8 @@ Each criterion is marked with a different severity level (high, medium, or low).
       <td>High</td>
     </tr>
     <tr>
-      <td>Oracle does not require grabbing information from the internet or downloading packages</td>
-      <td>The oracle solution must not have any actions that require accessing the internet. This includes downloading packages from the internet. Any dependencies required for the solution should be installed in the environment.</td>
+      <td>Oracle's internet use matches the <code>allow_internet</code> setting</td>
+      <td>When <code>allow_internet = false</code>, the oracle solution must not have any actions that require accessing the internet, including downloading packages — any dependencies required for the solution must be installed in the environment. When <code>allow_internet = true</code>, the oracle may access the internet where the task genuinely requires it.</td>
       <td>High</td>
     </tr>
     <tr>
@@ -242,8 +249,8 @@ Each criterion is marked with a different severity level (high, medium, or low).
       <td>High</td>
     </tr>
     <tr>
-      <td>Dockerfile or build scripts do not grab content from the web (other than packages).</td>
-      <td>The test.sh or other verifier files must not rely on any content from the internet. All verifier dependencies must be baked into the Dockerfile and cannot be downloaded at runtime.</td>
+      <td>Verifier files' internet use matches the <code>allow_internet</code> setting</td>
+      <td>When <code>allow_internet = false</code>, <code>test.sh</code> and other verifier files must not rely on any content from the internet, and all verifier dependencies must be baked into the Dockerfile (not downloaded at runtime). When <code>allow_internet = true</code>, verifier network use is allowed only where the task genuinely requires it, and grading must still be deterministic (see the determinism criterion above).</td>
       <td>High</td>
     </tr>
     <tr>
@@ -297,7 +304,12 @@ Each criterion is marked with a different severity level (high, medium, or low).
     </tr>
     <tr>
       <td>Rubrics scores must be one of (+/- 1, 2, 3, or 5).</td>
-      <td>Rubrics scores can be positive or negative, but must be one of 1, 2, 3, 5, -1, -2, -3, or -5.</td>
+      <td>Rubrics scores can be positive or negative, but must be one of +1, +2, +3, +5, -1, -2, -3, or -5. Positive scores must carry the leading <code>+</code> (see the criterion below).</td>
+      <td>High</td>
+    </tr>
+    <tr>
+      <td>Positive rubric scores include an explicit <code>+</code> sign</td>
+      <td>Every positive score must be written with a leading <code>+</code> (e.g., <code>+1</code>, <code>+2</code>, <code>+3</code>, <code>+5</code>) — not a bare number like <code>3</code>. A rubric with unsigned positive scores must be sent back for revision.</td>
       <td>High</td>
     </tr>
     <tr>
@@ -414,6 +426,9 @@ memory_mb
 storage_mb
 allow_internet = false
 
+# Optional (Harbor resource fields — not required):
+# gpus, gpu_types, docker_flags
+
 # Milestone tasks ONLY:
 [environment]
 workdir
@@ -440,6 +455,11 @@ timeout_sec</pre></td>
       <td>Tags, languages, categories, and subcategories must be applicable to the task.</td>
       <td>Any assigned tag, language, category, or subcategory must be aligned with the actual content of the task. The definitions for categories and subcategories can be found in our documentation.</td>
       <td>Medium</td>
+    </tr>
+    <tr>
+      <td>Do not reject a task for omitted or blank optional resource fields.</td>
+      <td>The <code>gpus</code>, <code>gpu_types</code>, and <code>docker_flags</code> fields in <code>[environment]</code> are valid but <strong>optional</strong> Harbor resource fields. Since TB2 tasks should not require GPU, do <strong>not</strong> send a task back for revision solely because these fields are omitted or left blank. A task is equally valid with the full block (including <code>gpus</code>/<code>gpu_types</code>/<code>docker_flags</code>) or the minimal block (without them). <code>gpu_types</code> only matters when a task requests GPUs (<code>gpus &gt; 0</code>).</td>
+      <td>Low</td>
     </tr>
   </tbody>
 </table>

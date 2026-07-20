@@ -10,6 +10,7 @@ usage() {
 Usage: tb2_create_task.sh --task TASK_NAME [--template default|ui]
 
 Creates a TB2 task skeleton under tasks/TASK_NAME with stb init.
+Installs the workflow's canonical tests/test.sh template after initialization.
 EOF
 }
 
@@ -45,7 +46,10 @@ fi
 
 cd "$repo_root"
 stb init "tasks/$task_name" -p "$TB2_PROJECT_ID" -t "$template"
+mkdir -p "$task_dir/tests"
+install -m 0755 "$SCRIPT_DIR/../templates/tests/test.sh" "$task_dir/tests/test.sh"
 
 printf '\nCreated %s\n' "$task_dir"
-printf 'Next: author a medium or hard non-Python implementation task; prefer hard when viable and validate the hard-rating evidence, then run:\n'
-printf '  .opencode/scripts/tb2_validate_task.sh --task tasks/%s\n' "$task_name"
+printf 'Applied profile: .opencode/docs/local/workflow-profile.md\n'
+printf 'Next: author the task, then run:\n'
+printf '  .opencode/scripts/tb2_validate_task.sh --context create --task tasks/%s\n' "$task_name"

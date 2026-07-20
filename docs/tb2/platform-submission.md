@@ -97,8 +97,10 @@ build_timeout_sec = 600.0
 cpus = 2
 memory_mb = 4096
 storage_mb = 10240
-allow_internet = false
+allow_internet = false  # default — set true only if the task genuinely requires internet
 ```
+
+> `allow_internet = false` is the default and correct for tasks solvable offline. Set `allow_internet = true` only when the task genuinely requires internet (e.g., retrieving external/current information or a resource that can't be bundled). See [Dockerfile Best Practices](/portal/docs/creating-tasks/dockerfile-best-practices).
 
 ## Step 4: Configure Docker Environment
 
@@ -133,7 +135,7 @@ sudo dseditgroup -o edit -a $USER -t user docker
 Enter your task container interactively to test your solution:
 
 ```bash
-harbor tasks start-env -p <task-folder> -i
+stb harbor tasks start-env -p <task-folder> -i
 ```
 
 While in the container, test your solution approach to ensure it works as expected.
@@ -162,31 +164,7 @@ Create `tests/test.sh` and Python pytest files to verify task completion:
 
 Tests must fully cover the prompt: explicit requirements, implicitly expected behavior, and critical edge cases—with every prompt requirement mapped to a test. See [Writing Tests](/portal/docs/creating-tasks/writing-tests) for detail.
 
-**Example test.sh:**
-
-```bash
-#!/bin/bash
-set -uo pipefail
-
-mkdir -p /logs/verifier
-
-# Check if we're in a valid working directory
-if [ "$PWD" = "/" ]; then
-    echo "Error: No working directory set. Please set a WORKDIR in your Dockerfile before running this script."
-    echo 0 > /logs/verifier/reward.txt
-    exit 0
-fi
-
-# pytest and pytest-json-ctrf must be pre-installed in the Docker image.
-python -m pytest --ctrf /logs/verifier/ctrf.json /tests/test_outputs.py -rA
-rc=$?
-
-if [ "$rc" -eq 0 ]; then
-  echo 1 > /logs/verifier/reward.txt
-else
-  echo 0 > /logs/verifier/reward.txt
-fi
-```
+For this local workflow, generate `tests/test.sh` only from `.opencode/templates/tests/test.sh`.
 
 See [Writing Tests](/portal/docs/creating-tasks/writing-tests) for detailed guidance.
 
@@ -195,7 +173,7 @@ See [Writing Tests](/portal/docs/creating-tasks/writing-tests) for detailed guid
 Verify your solution passes all tests:
 
 ```bash
-harbor run -a oracle -p <task-folder>
+stb harbor run -a oracle -p <task-folder>
 ```
 
 This should **PASS**. If it doesn't, fix issues before proceeding.
@@ -252,10 +230,10 @@ Run final checks:
 
 ```bash
 # Oracle agent
-harbor run -a oracle -p <task-folder>
+stb harbor run -a oracle -p <task-folder>
 
 # LLMaJ checks
-harbor tasks check -m openai/@openai/gpt-5.5 harbor_tasks/<task_name>
+stb harbor tasks check -m openai/@openai/gpt-5.5 harbor_tasks/<task_name>
 ```
 
 ## Step 12: Create ZIP File

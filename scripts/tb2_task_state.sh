@@ -71,7 +71,9 @@ emit_state() {
 
   printf '\n== task metadata ==\n'
   if [ -f "$task_path/task.toml" ]; then
-    grep -E '^(category|subcategories|difficulty|languages|tags|allow_internet|estimated_duration_sec|codebase_size|number_of_milestones)\b' "$task_path/task.toml" || true
+    if ! python3 "$SCRIPT_DIR/tb2_metadata.py" summary "$task_path"; then
+      printf 'metadata_summary_status=failed\n'
+    fi
   else
     printf 'missing task.toml\n'
   fi

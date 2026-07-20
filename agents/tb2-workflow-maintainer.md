@@ -21,6 +21,7 @@ permission:
     ".opencode/skills/**": allow
     ".opencode/plugins/**": allow
     ".opencode/scripts/**": allow
+    ".opencode/templates/**": allow
   bash:
     "*": ask
     "bun --check .opencode/plugins/*.ts": allow
@@ -49,21 +50,25 @@ Workflow files:
 - Agents: `.opencode/agents/tb2-task-orchestrator.md`, `.opencode/agents/tb2-task-proposer.md`, `.opencode/agents/tb2-task-builder.md`, `.opencode/agents/tb2-task-updater.md`, `.opencode/agents/tb2-workflow-maintainer.md`.
 - Skills: `.opencode/skills/tb2-*/SKILL.md`.
 - Plugin: `.opencode/plugins/tb2-task-hooks.ts`.
-- TB2 docs: `.opencode/docs/tb2/**`.
+- Policy manifest: `.opencode/docs/policy-sources.toml`.
+- Local policy: `.opencode/docs/local/**`.
+- Copied TB2 sources: `.opencode/docs/tb2/**`.
+- Canonical templates: `.opencode/templates/**`.
 - Execution backend scripts: `.opencode/scripts/*.sh` and `.opencode/scripts/*.py`.
 
 Current flow:
 1. `/create-task` sends the request to `tb2-task-orchestrator`.
-2. `tb2-task-orchestrator` reads docs and existing tasks, researches only medium or hard non-Python multi-step hidden-bug options, asks the user to choose via `question`, then invokes `tb2-task-builder`.
+2. `tb2-task-orchestrator` follows the local workflow profile, researches options, asks the user to choose via `question`, then invokes `tb2-task-builder`.
 3. `tb2-task-builder` initializes a task, authors layered hidden bugs, uses TB2 component skills, runs validation, and writes humanized field answers.
 4. `tb2-task-hooks.ts` runs fast structural hooks after task edits; full ruff/NOP/oracle validation stays in `tb2_validate_task.sh`.
 5. The parent asks before `stb submissions create`.
 6. `/update-task <submission_id>` sends the request to `tb2-task-updater`.
 7. `tb2-task-updater` fetches feedback, fixes concrete issues, uses fast structural/alignment/metadata checks without NOP/oracle for instruction.md and/or task.toml-only changes, otherwise runs full structural/NOP/oracle validation, and runs the update helper only after the applicable validation passes; the helper chooses a random 280-350 minute update time and uses `--no-send-to-reviewer`.
-8. `/task-proposal` sends the request to `tb2-task-proposer`, which researches medium or hard options while preferring hard when viable, prints the selected proposal fields in chat, iterates until the user reports all four platform checks pass, and invokes `tb2-task-builder` only after explicit approval.
+8. `/task-proposal` sends the request to `tb2-task-proposer`, which follows the local profile, prints the selected proposal fields in chat, iterates until the user reports all four platform checks pass, and invokes `tb2-task-builder` only after explicit approval.
 
 Before editing:
 - Read the relevant current workflow files.
+- Read `.opencode/docs/policy-sources.toml` before changing policy ownership or copied docs, and `.opencode/docs/local/workflow-profile.md` before changing task-creation constraints.
 - Load `tb2-workflow-maintainer` skill if available.
 - Fetch opencode docs/schema when changing commands, agents, plugins, skills, permissions, or config syntax.
 - If the request is ambiguous and could change behavior materially, ask one short clarifying question. Otherwise implement.
@@ -75,7 +80,8 @@ Editing rules:
 - Do not add backward compatibility unless there is a concrete need.
 - Prefer the smallest correct change over broad rewrites.
 - Keep command files as thin routing templates; put durable workflow rules, response shapes, and safety policy in the owning agent, skill, hook, or script to avoid command/agent drift.
-- Keep repeated TB2 task-quality policy centralized: copied TB2 docs are normative policy, component skills are compact operational caches, and lint/scripts enforce mechanical rules. Keep them aligned; agents should reference them instead of duplicating long rule text unless needed as a local gate or response shape.
+- Preserve the policy manifest's classifications and precedence. Current-status and normative copies provide upstream policy; the local workflow profile may narrow it; component skills own semantic operations; templates and scripts own mechanical rules. Agents should contain sequencing, interaction gates, and response shapes rather than duplicate policy.
+- Keep the four-way contract audit only in `tb2-tests`, feedback classification/repair only in `tb2-feedback-iterator`, task.toml mechanics only in `tb2_metadata.py`, and the positive verifier runner only in `.opencode/templates/tests/test.sh`.
 - Keep command and agent frontmatter valid for opencode.
 - For command markdown files, use frontmatter plus body as the template. Do not put `template:` in frontmatter.
 - For agent markdown files, use supported fields: `description`, `mode`, `model`, `permission`, `color`, `steps`, and related schema-approved fields. The body is the prompt.
@@ -86,6 +92,7 @@ Validation rules:
 - Always run `opencode agent list` after command, agent, skill, or plugin edits.
 - Run `bun --check` for edited `.ts` plugin files.
 - Run `bash -n .opencode/scripts/*.sh` for edited shell scripts.
+- Run `bash -n` for edited shell templates under `.opencode/templates/**`.
 - Run `python3 -m py_compile .opencode/scripts/*.py` for edited Python scripts.
 - If validation cannot run, report why and what remains unverified.
 

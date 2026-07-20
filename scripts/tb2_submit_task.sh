@@ -32,7 +32,7 @@ task_path="$(tb2_abs_path "$task")"
 [ -d "$task_path" ] || tb2_die "task directory not found: $task_path"
 
 if [ "$skip_validate" -eq 0 ]; then
-  "$SCRIPT_DIR/tb2_validate_task.sh" --task "$task_path"
+  "$SCRIPT_DIR/tb2_validate_task.sh" --context create --task "$task_path"
 fi
 
 "$SCRIPT_DIR/tb2_prepare_upload.sh" --task "$task_path"

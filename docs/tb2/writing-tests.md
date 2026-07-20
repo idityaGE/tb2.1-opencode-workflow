@@ -96,10 +96,6 @@ Tests need to fully cover all aspects of the prompt (instruction.md). This inclu
 
 Every requirement in the prompt must map to a test. If it is implied or stated in the prompt but not covered by tests, that is a miss.
 
-Before validation, perform a private bidirectional coverage audit. Split the task contract into independently violable requirements from the prompt and any normative clauses used from approved environment documents such as `environment/README.md`, `environment/spec.md`, or `environment/rule.md`. For each requirement, record a private ID, its source, the pytest functions that cover it, the exact assertion or independent-reference result that would reject a violation, the input class, and one plausible violation probe. Merely executing the relevant command, checking that a file exists, or relying on one broad end-to-end test does not prove the behavior. The audit stays private; do not copy its requirement inventory into `instruction.md` or supporting documents.
-
-Then reverse the audit: map every semantically distinct verifier assertion back to an explicit instruction requirement, an approved contract clause, or behavior with only one reasonable interpretation. If no basis exists, add the smallest neutral observable contract or remove the unfair assertion. A test is not justified only because it catches a seeded bug. Finish with zero uncovered requirements and zero ungrounded tested behaviors, cover every important edge class, and confirm that every intended hidden failure layer can affect the score. Re-run the audit after changing instructions, an approved contract, tests, or the oracle. Keep the matrix private so it does not become a hint or stale task artifact.
-
 | instruction.md says... | Test verifies... |
 |-------------------|------------------|
 | "Return empty list for empty input" | `test_empty_input_returns_empty_list` |
@@ -126,14 +122,14 @@ def test_returns_float():
     """The return type is a float"""
 ```
 
-**Potential boundary case:**
+**Implicit test / edge case:**
 
 ```python
 def test_division_by_zero():
-    """It produces the documented zero-divisor outcome."""
+    """It handles division by zero"""
 ```
 
-The prompt should not enforce this test as written until it states the observable zero-divisor outcome. Raising an exception, returning an error value, and using an infinity representation can all be reasonable contracts. “Implicit behavior” is not permission to invent a hidden requirement when multiple outcomes are plausible.
+The prompt never mentions division by zero, but any reasonable person reading "a function that divides two numbers" would expect it to handle that case.
 
 ### 4. Cover Edge Cases
 
@@ -162,29 +158,7 @@ def test_special_characters():
 
 The test runner script sets up the verifier command, runs Python pytest against the test file, and produces a reward file. Do not replace pytest with another test framework such as JUnit, Jest, or `go test`; use Python pytest tests to drive and validate those systems when needed. It must not install packages or fetch anything from the network at runtime. Bake pytest, plugins, browser drivers, wheels, npm packages, and any other verifier dependencies into the Docker image instead.
 
-```bash
-#!/bin/bash
-set -uo pipefail
-
-# Check if we're in a valid working directory
-if [ "$PWD" = "/" ]; then
-    echo "Error: No working directory set. Please set a WORKDIR in your Dockerfile before running this script."
-    mkdir -p /logs/verifier
-    echo 0 > /logs/verifier/reward.txt
-    exit 0
-fi
-
-mkdir -p /logs/verifier
-
-# pytest and pytest-json-ctrf must be pre-installed in the Docker image.
-python -m pytest --ctrf /logs/verifier/ctrf.json /tests/test_outputs.py -rA
-rc=$?
-if [ "$rc" -eq 0 ]; then
-  echo 1 > /logs/verifier/reward.txt
-else
-  echo 0 > /logs/verifier/reward.txt
-fi 
-```
+The local workflow generates this file from `.opencode/templates/tests/test.sh`. That checked-in file is the only positive runner template; do not reconstruct a runner from copied documentation examples.
 
 > **Note:** Test dependencies must be installed in the Dockerfile, NOT in `tests/test.sh`. `tests/test.sh` should not use `uvx`, `pip install`, `npm install`, `curl`, `wget`, `git clone`, or other networked setup commands. Local-only installs from preloaded wheels, such as `pip install --no-index -f /opt/wheels pytest==8.4.1`, are acceptable when needed.
 

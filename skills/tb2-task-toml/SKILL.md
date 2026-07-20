@@ -1,6 +1,6 @@
 ---
 name: tb2-task-toml
-description: Write correct Terminal-Bench 2 task.toml metadata, including category, subcategories, languages, tags, runtime limits, required zero milestones, and codebase_size based on environment file count.
+description: Write and review Terminal-Bench 2 task.toml metadata through the canonical schema/default helper and local workflow profile.
 ---
 
 # TB2 Task TOML
@@ -8,18 +8,8 @@ description: Write correct Terminal-Bench 2 task.toml metadata, including catego
 Use when writing or reviewing `task.toml`.
 
 Requirements:
-- Use Edition 2 metadata: `version = "2.0"`, `[metadata]`, `[environment]`, and for regular tasks `[agent]` plus `[verifier]`.
-- `author_name` and `author_email` may be `anonymous`.
-- Match category, subcategories, languages, tags, timeouts, and difficulty to the actual task.
-- Set `difficulty` to `medium` or `hard` according to the selected target; this workflow does not create `easy` or `unknown` tasks.
-- Follow the centralized category policy in `tb2-hard-task-author`, then use the exact current taxonomy slug for the selected primary activity. Local lint derives accepted and blocked slugs from the taxonomy document.
-- Make `category` agree with the prompt, final artifact, environment, and dominant verifier behavior; never relabel a blocked primary activity.
-- `subcategories` must contain only these exact values: `api_integration`, `db_interaction`, `long_context`, `tool_specific`, `ui_building`. Values such as `binary-analysis`, `program-analysis`, `cryptography`, `protocols`, `compiler`, or language names are invalid; put those details in `tags` instead.
-- If none of the five allowed subcategories fits, leave the array empty with `subcategories = []`. Most system-administration and build tasks should leave it empty.
-- List the actual non-Python implementation language. Do not list or use Python for primary task/oracle work; Python is allowed only for pytest verifier tooling.
-- Set `allow_internet = false` by default; use `true` only when the task genuinely requires runtime internet and deterministic solving and grading remain possible.
-- Always include `number_of_milestones = 0` in `[metadata]`; local lint blocks missing values and nonzero milestone counts.
-- Compute `codebase_size` from files under `environment/`, excluding `Dockerfile` and `docker-compose.yaml`/`.yml`: `minimal` for 0-19 files, `small` for 20-199, and `large` for 200 or more.
-- If `docker-compose.yaml`/`.yml` exists, set `custom_docker_compose = true`; also set `is_multi_container = true` only when the task actually uses multiple containers.
-- Use 3-6 truthful tags for domain details. For tool/API/database subcategories, include the concrete tool, API framework, or database in tags.
-- Keep metadata truthful; do not overstate language, size, or domain.
+- Read `.opencode/docs/local/workflow-profile.md` for create-versus-revision policy.
+- Use `.opencode/scripts/tb2_metadata.py` as the only mechanical source for required fields, defaults, live category status, platform labels, allowed subcategories, and codebase-size calculation. Run `python3 .opencode/scripts/tb2_metadata.py defaults`, `categories`, `platform-label <slug>`, or `summary tasks/<task_name>` instead of maintaining another list here.
+- Match category, subcategories, languages, tags, estimates, timeouts, resources, compose flags, internet access, difficulty, and milestone count to the actual task. Defaults are starting values, not permission to write false metadata.
+- Follow the category-selection semantics in `tb2-hard-task-author`. Never rescue a blocked primary activity with wording or metadata-only relabeling.
+- For create-time mechanical checks, use `.opencode/scripts/tb2_task_lint.py --context create tasks/<task_name>`. For a revision, use `--context revision` so valid grandfathered metadata is preserved while the schema remains checked.

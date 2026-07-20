@@ -7,7 +7,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 usage() {
   cat <<'EOF'
-Usage: tb2_validate_task.sh --task TASK_DIR
+Usage: tb2_validate_task.sh --task TASK_DIR [--context create|revision]
 
 Runs structural lint, ruff, NOP, and oracle checks. NOP must earn reward 0 and
 oracle must earn reward 1. On success, records a small runtime-file validation
@@ -88,16 +88,19 @@ PY
 }
 
 task=""
+context="revision"
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --task) task="${2:-}"; shift 2 ;;
+    --context) context="${2:-}"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) tb2_usage_error "unknown argument: $1" ;;
   esac
 done
 
 [ -n "$task" ] || tb2_usage_error "--task is required"
+case "$context" in create|revision) ;; *) tb2_usage_error "--context must be create or revision" ;; esac
 repo_root="$(tb2_repo_root)"
 task_path="$(tb2_abs_path "$task")"
 [ -d "$task_path" ] || tb2_die "task directory not found: $task_path"
@@ -108,7 +111,7 @@ printf '== Upload preparation ==\n'
 "$SCRIPT_DIR/tb2_prepare_upload.sh" --task "$task_path"
 
 printf '== Structural lint ==\n'
-python3 "$SCRIPT_DIR/tb2_task_lint.py" "$task_path"
+python3 "$SCRIPT_DIR/tb2_task_lint.py" --context "$context" "$task_path"
 
 printf '\n== Ruff verifier/helper check ==\n'
 if command -v ruff >/dev/null 2>&1; then

@@ -4,45 +4,14 @@
 from __future__ import annotations
 
 import ast
+import argparse
 import re
 import stat
 import sys
 import tomllib
 from pathlib import Path
 
-
-TAXONOMY_PATH = Path(__file__).resolve().parents[1] / "docs" / "tb2" / "task-taxonomy.md"
-
-
-def load_category_policy(path: Path) -> tuple[frozenset[str], frozenset[str]]:
-    """Derive exact category slugs and blocked status from the canonical taxonomy."""
-    text = path.read_text(errors="replace")
-    categories_match = re.search(
-        r"(?ms)^## Categories\s*$\n(.*?)^## Distribution Guidelines\s*$", text
-    )
-    if categories_match is None:
-        raise RuntimeError(f"could not parse category section from {path}")
-
-    allowed: set[str] = set()
-    blocked: set[str] = set()
-    for match in re.finditer(
-        r"(?ms)^###\s+([^\n]+?)\s*$\n(.*?)(?=^###\s+|\Z)", categories_match.group(1)
-    ):
-        slug = match.group(1).strip().lower()
-        if not re.fullmatch(r"[a-z][a-z0-9-]*", slug):
-            raise RuntimeError(f"invalid category heading {match.group(1)!r} in {path}")
-        if "currently blocked" in match.group(2).lower():
-            blocked.add(slug)
-        else:
-            allowed.add(slug)
-
-    if not allowed:
-        raise RuntimeError(f"no allowed categories found in {path}")
-    return frozenset(allowed), frozenset(blocked)
-
-
-ALLOWED_CATEGORIES, BLOCKED_CATEGORIES = load_category_policy(TAXONOMY_PATH)
-ALLOWED_DIFFICULTIES = ("hard", "medium")
+from tb2_metadata import metadata_issues
 BLOCKED_INSTRUCTION_PATTERNS = {
     r"\b(?:fix|repair|debug|patch)(?:s|es|ed|ing)?\b": "debugging/software-engineering",
     r"\bfailing[- ]tests?\b": "debugging/software-engineering",
@@ -75,7 +44,6 @@ EMOJI_PATTERN = re.compile(
     "\u2600-\u27BF"
     "]"
 )
-ALLOWED_SUBCATEGORIES = {"api_integration", "db_interaction", "long_context", "tool_specific", "ui_building"}
 DOC_HELP_DIRS = {"doc", "docs", "documentation", "guide", "guides", "help", "manual", "manuals"}
 DOC_HELP_FILE_NAMES = {
     "readme",
@@ -208,19 +176,22 @@ def check_test_runner(path: Path) -> None:
     )
     if set_index is None:
         fail(f"{path}: must include `set -uo pipefail`")
-    working_directory_guard = [
+    working_directory_guard_prefix = [
         'if [ "$PWD" = "/" ]; then',
         'echo "Error: No working directory set. Please set a WORKDIR in your Dockerfile before running this script."',
         "mkdir -p /logs/verifier",
         "echo 0 > /logs/verifier/reward.txt",
-        "exit 0",
-        "fi",
+    ]
+    working_directory_guards = [
+        [*working_directory_guard_prefix, "exit 0", "fi"],
+        [*working_directory_guard_prefix, "exit 1", "fi"],
     ]
     guard_index = next(
         (
             index
-            for index in range(len(sig_lines) - len(working_directory_guard) + 1)
-            if sig_lines[index : index + len(working_directory_guard)] == working_directory_guard
+            for guard in working_directory_guards
+            for index in range(len(sig_lines) - len(guard) + 1)
+            if sig_lines[index : index + len(guard)] == guard
         ),
         None,
     )
@@ -230,7 +201,7 @@ def check_test_runner(path: Path) -> None:
         fail(f"{path}: root working-directory guard must immediately follow `set -uo pipefail`")
     pytest_index = next((index for index, line in enumerate(sig_lines) if "python -m pytest" in line), None)
     if pytest_index is not None and guard_index is not None:
-        after_guard = guard_index + len(working_directory_guard)
+        after_guard = guard_index + len(working_directory_guards[0])
         if "mkdir -p /logs/verifier" not in sig_lines[after_guard:pytest_index]:
             fail(f"{path}: must create /logs/verifier before running pytest")
     elif "mkdir -p /logs/verifier" not in sig_lines:
@@ -319,37 +290,6 @@ def check_instruction_prompt(path: Path) -> None:
         warn(f"{path}: prompt is {words} words; 180-250 is preferred")
     elif words < 150:
         warn(f"{path}: prompt is {words} words; 180-250 is preferred when the contract permits")
-
-
-def check_category(path: Path, category: str) -> None:
-    if category in BLOCKED_CATEGORIES:
-        fail(
-            f"{path}: category {category!r} is currently blocked; classify the task by its "
-            "truthful primary activity and redesign it if blocked work dominates"
-        )
-    elif category not in ALLOWED_CATEGORIES:
-        allowed = ", ".join(sorted(ALLOWED_CATEGORIES))
-        fail(f"{path}: category {category!r} is not an exact allowed category (use one of: {allowed})")
-
-
-def environment_file_count(task: Path) -> int:
-    env = task / "environment"
-    if not env.exists():
-        return 0
-    excluded = {"Dockerfile", "docker-compose.yaml", "docker-compose.yml"}
-    return sum(
-        1
-        for path in env.rglob("*")
-        if path.is_file() and path.relative_to(env).as_posix() not in excluded
-    )
-
-
-def expected_codebase_size(file_count: int) -> str:
-    if file_count >= 200:
-        return "large"
-    if file_count >= 20:
-        return "small"
-    return "minimal"
 
 
 def check_no_solver_helper_docs(task: Path) -> None:
@@ -479,7 +419,7 @@ def check_milestone_task(task: Path, metadata: dict, config: dict) -> None:
             check_test_docstrings(base / "tests" / f"test_m{index}.py")
 
 
-def check_task(task: Path) -> int:
+def check_task(task: Path, *, context: str) -> int:
     print(f"Checking {task}")
     before_failures = FailureCounter.count
 
@@ -488,70 +428,21 @@ def check_task(task: Path) -> int:
         fail(f"{task}: missing task.toml")
         return 1
     config = load_toml(config_path)
-    metadata = config.get("metadata", {})
+    raw_metadata = config.get("metadata", {})
+    metadata = raw_metadata if isinstance(raw_metadata, dict) else {}
 
-    if config.get("version") != "2.0":
-        fail(f"{config_path}: version must be 2.0")
-    for section in ("metadata", "environment"):
-        if section not in config:
-            fail(f"{config_path}: missing [{section}] section")
+    metadata_errors, metadata_warnings = metadata_issues(config, task, context=context)
+    for message in metadata_errors:
+        fail(f"{config_path}: {message}")
+    for message in metadata_warnings:
+        warn(f"{config_path}: {message}")
 
-    milestone_value = metadata.get("number_of_milestones")
-    if "number_of_milestones" not in metadata:
-        fail(f"{config_path}: Missing required field: .metadata.number_of_milestones")
-    elif not isinstance(milestone_value, int) or isinstance(milestone_value, bool):
-        fail(f"{config_path}: .metadata.number_of_milestones must be the integer 0")
-    elif milestone_value != 0:
-        fail(f"{config_path}: .metadata.number_of_milestones must be 0")
-    milestones = 0
-    if milestones == 0:
-        for section in ("agent", "verifier"):
-            if section not in config:
-                fail(f"{config_path}: missing [{section}] section")
-
-    category = str(metadata.get("category", ""))
-    check_category(config_path, category)
-
-    if "difficulty" not in metadata:
-        fail(f"{config_path}: Missing required field: .metadata.difficulty")
-    else:
-        difficulty = metadata.get("difficulty")
-        if difficulty not in ALLOWED_DIFFICULTIES:
-            allowed = ", ".join(ALLOWED_DIFFICULTIES)
-            fail(f"{config_path}: Invalid difficulty {difficulty!r} (must be one of: {allowed})")
-
-    subcategories = metadata.get("subcategories", [])
-    if not isinstance(subcategories, list):
-        fail(f"{config_path}: subcategories must be a list; use [] if none of the allowed subcategories fit")
-        subcategories = []
-    invalid_subcategories = [str(item) for item in subcategories if str(item) not in ALLOWED_SUBCATEGORIES]
-    if invalid_subcategories:
-        allowed = ", ".join(sorted(ALLOWED_SUBCATEGORIES))
-        fail(f"{config_path}: Invalid subcategories {invalid_subcategories!r} (must be one of: {allowed}; use [] if none fit)")
-
-    languages = {str(lang).lower() for lang in metadata.get("languages", [])}
-    if "python" in languages:
-        fail(f"{config_path}: Python must not be listed as a primary task language")
-
-    tags = metadata.get("tags", [])
-    if not (3 <= len(tags) <= 6):
-        warn(f"{config_path}: tags should contain 3-6 entries")
-    env = config.get("environment", {})
-    allow_internet = env.get("allow_internet")
-    if not isinstance(allow_internet, bool):
-        fail(f"{config_path}: [environment].allow_internet must be a boolean")
-    elif allow_internet:
-        warn(f"{config_path}: semantic review must confirm runtime internet is genuinely required and deterministic")
-
-    compose_paths = [task / "environment" / name for name in ("docker-compose.yaml", "docker-compose.yml")]
-    if any(path.exists() for path in compose_paths) and metadata.get("custom_docker_compose") is not True:
-        fail(f"{config_path}: docker-compose tasks must set custom_docker_compose = true in [metadata]")
-
-    file_count = environment_file_count(task)
-    expected_size = expected_codebase_size(file_count)
-    actual_size = metadata.get("codebase_size")
-    if actual_size != expected_size:
-        fail(f"{config_path}: codebase_size is {actual_size!r}, expected {expected_size!r} for {file_count} environment files")
+    milestone_value = metadata.get("number_of_milestones", 0)
+    milestones = (
+        milestone_value
+        if isinstance(milestone_value, int) and not isinstance(milestone_value, bool) and milestone_value > 0
+        else 0
+    )
 
     dockerfile = task / "environment" / "Dockerfile"
     if not dockerfile.exists():
@@ -582,17 +473,18 @@ def fail(message: str) -> None:  # type: ignore[no-redef]
 
 
 def main(argv: list[str]) -> int:
-    if len(argv) < 2:
-        print("Usage: tb2_task_lint.py TASK_DIR [TASK_DIR ...]", file=sys.stderr)
-        return 2
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--context", choices=("create", "revision"), default="revision")
+    parser.add_argument("tasks", nargs="+")
+    args = parser.parse_args(argv[1:])
     rc = 0
-    for arg in argv[1:]:
+    for arg in args.tasks:
         task = Path(arg).resolve()
         if not task.exists():
             fail(f"{task}: does not exist")
             rc = 1
             continue
-        rc = max(rc, check_task(task))
+        rc = max(rc, check_task(task, context=args.context))
     if FailureCounter.count:
         print(f"{FailureCounter.count} blocking issue(s) found")
     else:

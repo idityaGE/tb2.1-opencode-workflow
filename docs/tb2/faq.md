@@ -1,6 +1,6 @@
 # Terminus 2nd Edition — Frequently Asked Questions
 
-*Last updated: April 27, 2026*
+*Last updated: June 29, 2026*
 
 > **How to use this document:** Sections are ordered to follow the task lifecycle — from onboarding through building, testing, submitting, and getting paid. Use `Ctrl+F` to search for keywords, or jump to a section below.
 
@@ -51,7 +51,7 @@ No — work on and submit multiple tasks in parallel.
 **I'm getting "Your account is not assigned to any Terminal-Bench project."**
 Expected if you haven't been onboarded to the main project yet. Complete and pass the assessment first, then wait for team confirmation. CLI and API keys only work after assignment.
 
-**I hit the maximum key refresh limit (10).**
+**I hit the maximum key refresh limit (20).**
 Post in #terminus-2nd-edition-submission and ask an admin to reset your key. They can delete the old key so you can regenerate, or top it up manually. You don't need to run the refresh command after an admin resets it.
 
 **`stb login` works but `stb keys refresh` fails with "Authentication failed."**
@@ -103,6 +103,12 @@ The old flat layout (root-level `milestone_x.md`, `solution/solve1.sh`, `tests/t
 **Do new file structure requirements apply to my older submissions that came back for revision?**
 No — new guidelines apply to new submissions only. If automated checks block a revision with new-only rules, report it in Slack. Workaround: make a trivial change (add a space, capitalize a letter) and resubmit to force a fresh check instead of cached results.
 
+**Do I need `gpus`, `gpu_types`, or `docker_flags` in my `task.toml`?**
+No — they're valid but **optional** Harbor fields. Both the full `[environment]` block (with them) and the minimal block (without) are accepted, and reviewers won't send a task back for omitting or blanking them. TB2 tasks should not require GPU. See [Dockerfile Best Practices §14](/portal/docs/creating-tasks/dockerfile-best-practices).
+
+**Can I set `allow_internet = true`?**
+Yes — both settings are allowed; the setting just has to **match the task**. Use `false` (default) when the task is fully solvable offline, and `true` only when it genuinely requires internet — retrieving current/external information, interacting with web resources, or downloading a resource that can't be bundled (e.g., a HuggingFace model). An eval checks whether internet is actually required, so `true` without a real need may be rejected. See [Dockerfile Best Practices → Internet access](/portal/docs/creating-tasks/dockerfile-best-practices).
+
 ---
 
 ## 4. Difficulty, Language & Codebase Size
@@ -145,7 +151,12 @@ Use files from public open-source repos to build a realistic project environment
 **1800 seconds** (30 minutes). Agents failing due to timeout contribute to difficulty.
 
 **Can I run concurrent agent tests (GPT-5.5 and Opus at the same time)?**
-Yes, but expect API errors and faster key exhaustion. Refresh keys more frequently if you do.
+It's possible, but **not encouraged** — expect API errors and much faster key exhaustion. Run one model's tests to completion before starting the other. See [Using Your API Key Efficiently](/portal/docs/cli-user-guide#using-your-api-key-efficiently) in the CLI User Guide for tips on stretching your key budget.
+
+### Blocked Categories
+
+**Which categories are currently blocked?**
+As of Jul 10, 2026: **`debugging`**, **`software-engineering`** (both since Jun 18, 2026), and **`data-processing`** (since Jul 10) are paused — no net-new submissions, and they're hidden from the Task Gallery. **New milestone tasks are also blocked** (Jun 29). Tasks already in your revision queue or awaiting review continue through to Accepted as normal. Check the [Task Category Status](/portal/category-status) page for the live list.
 
 ---
 
@@ -194,32 +205,10 @@ exec "$@"
 ```
 
 **Cause 2: `set -euo pipefail` causes early exit.**
-If any command fails before writing `reward.txt`, the script exits. Drop `-e` and capture the exit code. Pytest and any plugins should be pre-installed in the Docker image; `test.sh` should only run the verifier and write the reward file (see [Writing Tests](/portal/docs/creating-tasks/writing-tests)):
-```bash
-#!/bin/bash
-set -uo pipefail
-
-if [ "$PWD" = "/" ]; then
-    echo "Error: No working directory set. Please set a WORKDIR in your Dockerfile before running this script."
-    mkdir -p /logs/verifier
-    echo 0 > /logs/verifier/reward.txt
-    exit 0
-fi
-
-mkdir -p /logs/verifier
-
-python -m pytest --ctrf /logs/verifier/ctrf.json /tests/test_m1.py -rA
-rc=$?
-
-if [ "$rc" -eq 0 ]; then
-  echo 1 > /logs/verifier/reward.txt
-else
-  echo 0 > /logs/verifier/reward.txt
-fi
-```
+If any command fails before writing `reward.txt`, the script exits. Pytest and its plugins belong in the Docker image. For regular tasks in this local workflow, replace the runner with `.opencode/templates/tests/test.sh` rather than copying a troubleshooting fragment; milestone revisions must preserve their existing milestone-specific pytest path.
 
 **Cause 3: Missing output directory.**
-Add `mkdir -p /logs/verifier` before running pytest, and keep the root-directory guard writing reward `0` when `$PWD` is `/`.
+Add `mkdir -p /logs/verifier` near the top of `test.sh`. The starter template may not include this line — add it yourself.
 
 **The quality check flags `source "$HOME/.local/bin/env"` as a typo.**
 Known false positive — ignore it.
@@ -235,6 +224,13 @@ RUN apt-get update \
 **The LLMaJ review says "NOT_APPLICABLE" with an empty summary.**
 Agents couldn't start (often a tmux session failure — see above). Report the task UUID in Slack.
 
+**`stb harbor check` fails with "Claude Code returned an unexpected response" or a Usage Policy error.**
+This is a **provider content refusal**, not a CLI bug and not a verdict on your task's correctness. The model running the quality check (e.g., Claude Code / GPT-5.5) flagged something in your task content as potentially violating the [Usage Policy](https://www.anthropic.com/legal/aup). The surface error is misleading — you may see `Received result: "success", but the operation was treated as a failure`, while the underlying cause is `API Error: Claude Code is unable to respond to this request, which appears to violate our Usage Policy. Try rephrasing the request in a new session or change your model.` Work through these in order:
+1. **Re-run the check** — refusals can be intermittent; a fresh session sometimes passes.
+2. **Switch the judge model** — re-run with the other model (swap `@openai/gpt-5.5` ↔ `@anthropic/claude-opus-4-8`). A refusal on one model frequently clears on the other.
+3. **Review your task content** — security/exploit/malware-adjacent framing, harmful instructions, or sensitive-looking data can trip the flag even for legitimate tasks. Where possible, frame the task in clearly legitimate, defensive/educational terms.
+4. **Escalate** — if the task is legitimately security-related (e.g., a CTF or defensive-security task) and keeps refusing on every model, post the task UUID in #terminus-2nd-edition-submission so the team can review.
+
 ### Docker Issues
 
 **My `environment/app` folder isn't being mounted in Harbor.**
@@ -245,6 +241,12 @@ Run `docker network prune` to clean up stale networks.
 
 **My Dockerfile references a base image that seems unavailable.**
 Some images may not be accessible on the platform. Post the exact image name and task UUID in Slack.
+
+**Which base image should I use?**
+Prefer one of the **10 canonical digest-pinned images** (Python, Node, Go, Rust, Java, Ruby, GCC, Maven, Debian, Ubuntu) listed in [Dockerfile Best Practices §2](/portal/docs/creating-tasks/dockerfile-best-practices). Non-canonical images are allowed with a brief, credible justification in the Dockerfile or task README; missing/vague justifications are blocked. Tasks whose CI passed before Jun 15, 2026 are grandfathered — reviewers shouldn't flag their base image (pinning is still required).
+
+**Can my tests contain solution logic or hardcoded values?**
+Rigorous verifier logic is fine — running your own binary, parsing its output, golden fixtures/hashes, and spec-derived invariants are all **legitimate**. Two things to avoid: a callable function in `tests/` that maps task inputs to the complete expected artifact (end-to-end solving belongs in `solution/`), and hardcoding values the instruction says the agent must read from a config file. Hardcoded expected *results* (exact numeric/ML targets) are fine and often required. See [Writing Tests → What a Good Verifier Legitimately Does](/portal/docs/creating-tasks/writing-tests).
 
 ---
 
@@ -275,18 +277,31 @@ You can also drill into a specific submission:
 See the [CLI User Guide → Check submission status](/portal/docs/cli-user-guide#check-submission-status) for the full set of submission commands.
 
 **What is the daily submission limit?**
-| Expert level | Limit |
-|---|---|
-| New (before 2 accepted tasks) | 2 new per day |
-| Established (2+ accepted tasks) | 5 new per day |
+Net-new tasks are capped per day by Expert level:
 
-Revisions **do not count** toward this limit. Resets at **midnight UTC** (~7–8 PM EST). If you're being blocked despite not hitting your limit, report it — this is a known bug.
+| Expert level | Net-new tasks per day |
+|---|---|
+| New (before 2 accepted tasks) | 2 per day |
+| Veteran (2+ accepted tasks) | 3 per day |
+
+Only **net-new** submissions count toward this cap — **revisions do not**. Resets at **midnight UTC** (~7–8 PM EST).
+
+**What is the revision-queue limit?**
+You can have at most **10 submissions in your revision queue at once**. Once you reach 10, you're blocked from submitting any net-new tasks until you make room. To clear a task you don't intend to revise, hit **"Discard"** on it — that rejects the task and removes it from your revision queue.
+
+If you're blocked from a net-new submission while under your daily limit, check whether your revision queue is full (10) before reporting a bug.
 
 **My submission is auto-rejected by AutoEval even though it passes manual checks.**
 Known intermittent issue. Resubmit. If persistent, post your submission ID and failing build ID in Slack.
 
 **All my quality checks pass and say "READY TO USE," but a reviewer still sent it back.**
 "READY TO USE" is the *automated* agent review — it's not a guarantee of human approval. Reviewers evaluate rubric quality, instruction clarity, test coverage, and task design beyond what automated tools can assess.
+
+**Do I have to build the task exactly as the gallery idea describes?**
+No — task ideas are **starting points, not strict specs**. Adapt, extend, or deviate as needed; your task just has to meet the quality and difficulty requirements.
+
+**Can I still download the task skeleton after claiming?**
+Yes. The skeleton download appears on the claim-success screen and stays available anytime from **My Tasks** — open the claimed task and use **Download Skeleton**. (Previously it was only available pre-claim.)
 
 ### Reviews & Disputes
 
@@ -312,6 +327,9 @@ They shouldn't be — new rules are for new submissions only. If a reviewer enfo
 |---|---|
 | ≥1 negative criterion per milestone rubric | **Hard requirement** — triggers revision if missing |
 | 10–40 points per milestone (max cumulative score) | **Flaggable**, but not a sole reason for revision |
+
+**Do positive rubric scores need an explicit `+` sign?**
+Yes. Every positive score must be written `+1`/`+2`/`+3`/`+5` — a bare `3` will be sent back for revision (High severity). Negative scores use `-`. See [Rubrics → Strict Formatting Rules](/portal/docs/understanding-tasks/rubrics).
 
 **How do I generate rubrics?**
 Check "Generate Rubric(s)" and submit _without_ checking "Send to Reviewer". Generation happens during CI checks (not Fast Static Checks) — rubrics don't appear instantly. Editing is only possible through the portal UI.
@@ -389,3 +407,4 @@ Yes. The current schedule is **pinned at the top of the `#terminus-2nd-edition-a
 | Quality check false-flags `source "$HOME/.local/bin/env"` | Ignore this specific flag |
 | Agent logs unavailable for some reviews | Report with task UUID |
 | Docker network limit from repeated harbor runs | Run `docker network prune` |
+| `stb harbor check` fails: "unexpected response" / Usage Policy refusal | Provider content refusal — re-run, switch judge model (`gpt-5.5` ↔ `claude-opus-4-8`), review content; escalate with UUID if a legitimate task keeps failing |

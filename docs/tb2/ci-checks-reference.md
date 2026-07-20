@@ -12,7 +12,7 @@ stb harbor run -m @openai/gpt-5.5 -p <task-folder>
 For a pre-submission static pass, run:
 
 ```bash
-harbor tasks check <task-folder> -m openai/@openai/gpt-5.5
+stb harbor tasks check <task-folder> -m openai/@openai/gpt-5.5
 ```
 
 ## Structural Checks
@@ -304,31 +304,7 @@ Remove references such as:
 
 **What it checks:** `tests/test.sh` runs the Python pytest verifier, produces a reward file, and uses dependencies that were baked into the image. For non-Python tasks, the pytest file should call the application or service under test rather than replacing pytest with another test runner.
 
-```bash
-#!/bin/bash
-set -uo pipefail
-
-# Check if we're in a valid working directory
-if [ "$PWD" = "/" ]; then
-    echo "Error: No working directory set. Please set a WORKDIR in your Dockerfile before running this script."
-    mkdir -p /logs/verifier
-    echo 0 > /logs/verifier/reward.txt
-    exit 0
-fi
-
-mkdir -p /logs/verifier
-
-# pytest and pytest-json-ctrf must be pre-installed in the Docker image.
-python -m pytest --ctrf /logs/verifier/ctrf.json /tests/test_outputs.py -rA
-rc=$?
-
-# Produce reward file (REQUIRED)
-if [ "$rc" -eq 0 ]; then
-  echo 1 > /logs/verifier/reward.txt
-else
-  echo 0 > /logs/verifier/reward.txt
-fi
-```
+The local positive runner source is `.opencode/templates/tests/test.sh`. Use this section to understand the check, not to synthesize another body.
 
 ### check_offline_tests
 
@@ -344,7 +320,7 @@ curl https://example.com/fixture.json
 git clone https://github.com/example/repo.git
 
 # Good: dependencies are baked into the image
-python -m pytest --ctrf /logs/verifier/ctrf.json /tests/test_outputs.py -rA
+python -m pytest /tests/test_outputs.py -rA
 
 # Good: local-only install from preloaded wheels
 pip install --no-index -f /opt/wheels pytest==8.4.1

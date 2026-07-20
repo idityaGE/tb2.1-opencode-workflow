@@ -25,4 +25,4 @@ done
 
 [ -n "$task" ] || tb2_usage_error "--task is required"
 
-python3 "$SCRIPT_DIR/tb2_task_lint.py" "$task"
+python3 "$SCRIPT_DIR/tb2_task_lint.py" --context revision "$task"

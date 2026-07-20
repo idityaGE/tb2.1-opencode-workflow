@@ -152,25 +152,13 @@ RUN mkdir -p /oracle
 
 **Why:** The Harbor harness expects a `reward.txt` file. Exiting before writing causes `RewardFileNotFound` errors.
 
-**Correct pattern:**
-
-```bash
-# ✅ Good - Always writes reward file
-python -m pytest --ctrf /logs/verifier/ctrf.json /tests/test_outputs.py -rA
-rc=$?
-
-if [ "$rc" -eq 0 ]; then
-  echo 1 > /logs/verifier/reward.txt
-else
-  echo 0 > /logs/verifier/reward.txt
-fi
-```
+**Correct pattern:** Use `.opencode/templates/tests/test.sh`, the local workflow's only positive runner template.
 
 **Example of what to avoid:**
 
 ```bash
 # ❌ Bad - Exits before writing reward file
-python -m pytest --ctrf /logs/verifier/ctrf.json /tests/test_outputs.py -rA
+python -m pytest /tests/test_outputs.py -rA
 
 exit_code=$?
 
@@ -220,7 +208,7 @@ pytest ${TEST_DIR:-/tests}/test_outputs.py -rA
 
 ```bash
 # ✅ Good - Hardcoded path (also acceptable)
-python -m pytest --ctrf /logs/verifier/ctrf.json /tests/test_outputs.py -rA
+pytest /tests/test_outputs.py -rA
 ```
 
 **Bad examples:**

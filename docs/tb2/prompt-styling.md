@@ -25,7 +25,7 @@ Every `instruction.md` should adhere to these six general principles:
 
 ### 1. Task Instructions Must be Concise
 
-- Task instructions should be concise and clear. Keep the complete prompt at or below 250 words, preferably around 200, using as little as one sentence and at most three short paragraphs.
+- Task instructions should be concise and clear. This means outlining the task in as little as one sentence, and as much as three paragraphs.
 
 - Tasks should not be long running with many different instructions/requirements to follow.
 
@@ -58,8 +58,7 @@ Every `instruction.md` should adhere to these six general principles:
 
     2. Is the expected output different in a way that is non trivial
 
-### 6. Task Instruction Must Use Absolute Paths and No Canary Strings
-- Every referenced path must be absolute.
+### 6. Task Instruction Must use Absolute Paths
 - The task instruction.md file should not contain a canary string. This is usually an indicator that you are using an older task skeleton. The canary string gets passed as part of the prompt which we do not want represented in the data.
 
 ## Human-Centric vs. Synthetic Styling
@@ -69,7 +68,7 @@ To maintain authenticity, compare these two styles:
 | Feature | Synthetic (Avoid) | Human-Centric (Target) |
 | :--- | :--- | :--- |
 | **Tone** | "You are an expert programmer. Your goal is to..." | "We need to migrate the existing SQLite schema to..." |
-| **Length** | 500+ words of redundant context. | Around 200 words when possible and always at or below 250. |
+| **Length** | 500+ words of redundant context. | 150-200 words of actionable info. |
 | **Guidance** | "First, use the `ls` command to see files, then..." | "The source data is in `/data`. Output the result to..." |
 
 ## Common Prompting Errors + Examples

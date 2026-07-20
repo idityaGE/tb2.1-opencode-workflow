@@ -29,50 +29,28 @@ Inputs:
 - The user may include additional constraints, but the only required command argument is the submission ID.
 
 Core responsibilities:
-- Fetch platform feedback.
-- Understand all concrete reviewer, quality, CI/LLMaJ, NOP/oracle, and agent-run issues.
-- Handle platform-only rubric feedback by rewriting the platform rubric for the user to paste back.
-- Locate the matching local task.
-- Fix all concrete issues while preserving task difficulty, sufficient instructions, and hidden-bug depth.
-- Validate according to changed-file scope before updating: instruction.md and/or task.toml-only changes use fast structural/alignment or metadata checks without NOP/oracle; runtime-affecting task changes require full NOP/oracle validation.
-- Run `stb submissions update` with `--no-send-to-reviewer` only after upload prep and validation pass. After a successful update, stop and report.
-- Prefer deterministic scripts over manual token-heavy inspection whenever a helper exists. Use script output for feedback fetching, task state, changed-file classification, instruction length, validation scope, upload cleanup, random update time, and structural checks; reserve file reads for concrete reasoning and edits.
+- Load `tb2-feedback-iterator` and let it own feedback classification, rubric handling, repair policy, component-skill selection, and validation routing.
+- Sequence feedback retrieval, task selection, user interaction gates, targeted edits, applicable validation, and the update helper.
+- Prefer deterministic helpers for feedback retrieval, task state, metadata, changed-file classification, validation scope, upload cleanup, and update time.
+- Report the prescribed progress table and final response without copying policy into this agent.
 
 Required workflow:
 1. Validate the submission ID. If missing, ask for it.
-2. Use the `tb2-feedback-iterator` skill to fetch and classify platform feedback.
-3. If feedback notes include `Task Instruction Sufficiency: ❌ FAIL`, or if any `instruction.md` edit is planned, load and follow `tb2-instruction` before editing the prompt. Load and follow `tb2-tests` whenever feedback concerns coverage or tested-but-undescribed behavior, or whenever `instruction.md`, an approved environment contract, the oracle, or any verifier file may change. Load `tb2-solution` whenever `solution/` or oracle completeness may change. Use the canonical runner shape when `tests/test.sh` changes and the four-way contract alignment audit for all contract/oracle/verifier changes.
-4. If reviewer feedback mentions a rubric issue, rubric blocks, milestone rubric headings, a flat-list requirement, or positive-score totals, handle it as platform-rubric feedback:
-   - Ask the user in chat to paste the current platform rubric exactly as shown in the platform UI. Do not use the `question` tool for this because the rubric may be multiline.
-   - Rewrite only after the user provides the rubric. For a single-step task with `number_of_milestones = 0`, remove `# Rubric 1` / `# Rubric 2` style blocks and produce one flat list. Preserve the reviewer-required negative criteria; format every criterion as `Agent …, ±N`, where `N` is 1, 2, 3, or 5 and positive scores include `+`. Keep positive criteria in the 10-40 point band; if merged positives exceed 40, trim or merge lower-value overlapping positives until the total is at most 40 while preserving reviewer-visible coverage. Do not add hints or hidden solution details.
-   - Show the revised rubric to the user, then copy exactly that revised rubric to the clipboard with `wl-copy` using a safe stdin or temporary-file command. If `wl-copy` is unavailable, report that copying is blocked and include the rubric text.
-   - If the only concrete feedback is platform-rubric feedback and no local task files need changes, do not run `stb submissions update`; report that the platform rubric was rewritten and copied for manual paste.
-5. Determine the task path from feedback metadata, `task.toml` references, or matching local tasks under `tasks/`. If still unclear and local task fixes are needed, ask one short question for the task path.
-6. Before editing, run `.opencode/scripts/tb2_task_state.sh --task tasks/<task_name> --write-cache` instead of manually inspecting git status, metadata, or instruction length. Send a short progress message with a Markdown table listing what is wrong and how you will fix it. Use columns: `Problem`, `Evidence`, `Planned fix`, and `Likely files`. Track every task file changed during this update using the deterministic task-state output. Then continue automatically; do not ask for permission unless the task path is unknown, the platform rubric is required, or another required user decision is unavoidable.
-7. Make only targeted fixes tied to concrete feedback unless the feedback proves a broader redesign is necessary.
-8. Preserve the task's honest `medium` or `hard` difficulty, multi-step depth, layered hidden bugs, and freedom from hints or bug-signposting comments. Never convert it to a Python implementation task.
-9. Keep all required behavior specified without turning `instruction.md` into a specification. Follow `tb2-instruction` and `.opencode/docs/tb2/instruction-authoring.md`: preserve the domain-first opening, clarify the objective, consequence, scope, absolute paths, major behavior/invalidity categories, or authoritative-document references, and keep blocked-category repair/file-processing framing out of the prose. Put necessary detailed declarative behavior in an explicitly referenced agent-visible README/spec/rule file under `environment/`, without revealing solution steps, exact bug locations, edge-case names, or implementation hints.
-10. If an instruction-sufficiency fix would make the task trivial, apply the triviality-rescue path: add the missing requirement neutrally, remove hint-like wording, then deepen the code or verifier with another hidden layer, generated cases, a non-local interaction, replay/recovery/order sensitivity, stricter semantic validation, or realistic codebase context before validation. Any added verifier depth must exercise a stated invariant; specify and audit any new observable behavior.
-11. If feedback says the task is trivial or too easy, harden it with additional layered hidden failure modes and behavioral tests while preserving the core concept.
-12. Do not weaken tests unless they are unfair, flaky, outside the prompt, or contradicted by platform feedback. If tests change, keep them behavioral and complete.
-13. Use targeted web research only when it helps resolve a concrete feedback issue around external specs, unusual languages, recent tool behavior, or library documentation. Use that research during revision only; do not vendor solver guides. Under `tb2-hard-task-author`, use its allowed agent-visible README/spec/rule files under `environment/`, including `environment/task_file/` when Docker copies that tree to `/app`. Preserve reviewer evidence in the progress summary, never put it in the task, reference each approved document by absolute in-container path from the prompt, and keep all documents necessary, realistic, declarative, and free of repair guidance, known issues, verifier-shaped edge-case lists, or seeded bug clues. Follow `tb2-hard-task-author` for runtime-internet policy.
-14. After edits, complete the private four-way contract alignment audit from `tb2-tests`, the clause-by-clause oracle review from `tb2-solution`, and the instruction sufficiency, ambiguity-ledger, and complete/domain-blind category-surface reviews from `tb2-instruction`. Require zero oracle omissions, zero uncovered requirements, zero ungrounded verifier behaviors, meaningful NOP failure, no vacuous/source-inspection/flaky tests, every critical edge class covered, and every intended hidden layer verifier-relevant. If an instruction change creates an oracle omission or uncovered obligation, update the oracle/verifier as needed and use full validation; `fast-only` is allowed only when the unchanged oracle and tests already satisfy the complete revised contract.
-15. Run `.opencode/scripts/tb2_task_state.sh --task tasks/<task_name> --write-cache` and use its `mode=` result.
-16. If mode is `fast-only`, run `.opencode/scripts/tb2_preflight_task.sh --task tasks/<task_name>` and check prompt/metadata alignment plus the completed four-way contract alignment audit against the valid runtime baseline. If runtime files must change, switch to `full`.
-17. If mode is `full`, run `.opencode/scripts/tb2_validate_task.sh --task tasks/<task_name>` until structural lint passes, NOP fails as required, and oracle passes, or a concrete blocker remains.
-18. Do not choose update time manually; `.opencode/scripts/tb2_update_task.sh` selects a random multiple of 10 between 280 and 350 minutes.
-19. Update with `.opencode/scripts/tb2_update_task.sh --task tasks/<task_name> --submission-id <submission_id>` only after validation passes. The helper runs upload prep. If prep changes files, it stops before upload; validate again and rerun it. If update succeeds, stop and report. If it fails for a non-retryable reason, report the blocker.
+2. Load and follow `tb2-feedback-iterator` from feedback fetch through repair and validation. Do not duplicate or override its classifications.
+3. If the skill needs the current platform rubric, ask for it in normal chat and wait. For platform-only rubric work, follow the skill, then return without locating or updating a task.
+4. Infer the local task path from feedback. Ask one short question only if local edits are required and the path remains ambiguous.
+5. Run `.opencode/scripts/tb2_task_state.sh --task tasks/<task_name> --write-cache`. Before editing, send a Markdown table with `Problem`, `Evidence`, `Planned fix`, and `Likely files`, then continue automatically.
+6. Load the component skills selected by `tb2-feedback-iterator`, make only the classified repairs, and run their semantic gates.
+7. Run task state again. For `fast-only`, run `.opencode/scripts/tb2_preflight_task.sh --context revision --task tasks/<task_name>`. For `full`, run `.opencode/scripts/tb2_validate_task.sh --context revision --task tasks/<task_name>` until it passes or a concrete blocker remains.
+8. After applicable validation passes, run `.opencode/scripts/tb2_update_task.sh --task tasks/<task_name> --submission-id <submission_id>`. If upload prep changes files, validate again before retrying. Stop after success or a non-retryable failure.
 
 Hard rules:
 - Never run update if the applicable validation mode fails.
-- Never use `fast-only` when any runtime-affecting task file changed or must change to keep prompt, metadata, verifier, or oracle behavior aligned. `fast-only` is only for regular zero-milestone `instruction.md` and/or root `task.toml` changes.
 - Never omit `--no-send-to-reviewer`.
 - Retry only fixable update failures. After a successful update, stop and report; any new concern needs a new user request.
-- Do not run `stb submissions update` for platform-only rubric edits; copy the revised rubric with `wl-copy` and tell the user to paste it into the platform.
 - Never run `stb submissions create`.
 - Do not modify unrelated tasks or workflow files.
-- Do not hide feedback issues; if something cannot be fixed, report the blocker.
-- Ignore generic AutoEval execution-failed wrapper lines and category-change warnings unless paired with concrete actionable evidence.
+- Do not reinterpret feedback policy in this agent; report any unresolved classification or repair blocker.
 
 Final response must be a bit detailed and use this shape:
 ```text
