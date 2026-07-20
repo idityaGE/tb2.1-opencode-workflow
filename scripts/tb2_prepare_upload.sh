@@ -9,8 +9,8 @@ usage() {
   cat <<'EOF'
 Usage: tb2_prepare_upload.sh --task TASK_DIR
 
-Prepares a task directory for platform upload by writing the canonical
-environment/.dockerignore and removing generated cache/archive clutter.
+Prepares a task directory for platform upload by removing generated cache
+directories and the generated root-level task archive.
 EOF
 }
 
@@ -24,28 +24,15 @@ while [ "$#" -gt 0 ]; do
 done
 
 [ -n "$task" ] || tb2_usage_error "--task is required"
+repo_root="$(tb2_repo_root)"
 task_path="$(tb2_abs_path "$task")"
 [ -d "$task_path" ] || tb2_die "task directory not found: $task_path"
 
-env_dir="$task_path/environment"
-mkdir -p "$env_dir"
-dockerignore="$env_dir/.dockerignore"
-tmp_file="$(mktemp "${TMPDIR:-/tmp}/tb2-dockerignore.XXXXXX")"
-cat > "$tmp_file" <<'EOF'
-**/__pycache__/
-**/*.pyc
-**/.pytest_cache/
-solution/
-tests/
-EOF
-
-dockerignore_status="unchanged"
-if ! cmp -s "$tmp_file" "$dockerignore" 2>/dev/null; then
-  mv "$tmp_file" "$dockerignore"
-  dockerignore_status="updated"
-else
-  rm -f "$tmp_file"
+tasks_root="$repo_root/tasks"
+if [ "$(dirname "$task_path")" != "$tasks_root" ]; then
+  tb2_die "task directory must be a direct child of $tasks_root: $task_path"
 fi
+[ -f "$task_path/task.toml" ] || tb2_die "task.toml not found in task directory: $task_path"
 
 pycache_removed=0
 while IFS= read -r -d '' cache_dir; do
@@ -54,12 +41,12 @@ while IFS= read -r -d '' cache_dir; do
 done < <(find "$task_path" -type d -name __pycache__ -prune -print0)
 
 zip_removed=0
-while IFS= read -r -d '' zip_file; do
+zip_file="$task_path/$(basename "$task_path").zip"
+if [ -f "$zip_file" ]; then
   rm -f "$zip_file"
-  zip_removed=$((zip_removed + 1))
-done < <(find "$task_path" -type f -name '*.zip' -print0)
+  zip_removed=1
+fi
 
 printf 'Upload preparation completed for %s\n' "$task_path"
-printf 'environment/.dockerignore: %s\n' "$dockerignore_status"
 printf 'removed __pycache__ directories: %s\n' "$pycache_removed"
-printf 'removed .zip files: %s\n' "$zip_removed"
+printf 'removed root task .zip files: %s\n' "$zip_removed"

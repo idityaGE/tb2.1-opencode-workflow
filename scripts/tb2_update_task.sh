@@ -35,9 +35,8 @@ task_path="$(tb2_abs_path "$task")"
 prep_output="$("$SCRIPT_DIR/tb2_prepare_upload.sh" --task "$task_path")"
 printf '%s\n' "$prep_output"
 
-if [[ "$prep_output" == *"environment/.dockerignore: updated"* ]] \
-  || [[ "$prep_output" =~ removed\ __pycache__\ directories:\ [1-9][0-9]* ]] \
-  || [[ "$prep_output" =~ removed\ \.zip\ files:\ [1-9][0-9]* ]]; then
+if [[ "$prep_output" =~ removed\ __pycache__\ directories:\ [1-9][0-9]* ]] \
+  || [[ "$prep_output" =~ removed\ root\ task\ \.zip\ files:\ [1-9][0-9]* ]]; then
   tb2_die "upload preparation changed files; validate and rerun this helper"
 fi
 

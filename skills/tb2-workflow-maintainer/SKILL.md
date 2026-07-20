@@ -31,7 +31,7 @@ Create-task backend scripts:
 - `tb2_task_state.sh`: prints and optionally caches compact deterministic task state so agents do not spend tokens manually classifying changed files, metadata, instruction length, or validation scope.
 - `tb2_hook_task_check.sh`: fast post-edit structural hook wrapper for one task.
 - `tb2_copy_field_answers.sh`: copies a full field-answer file or a single section without interactive pauses.
-- `tb2_prepare_upload.sh`: writes `environment/.dockerignore` and removes generated `__pycache__` directories and `.zip` files before validation, submission, or update upload.
+- `tb2_prepare_upload.sh`: validates that the target is a direct `tasks/<task>` folder, removes generated `__pycache__` directories, and deletes only the generated root-level `<task>.zip` archive before validation, submission, or update upload.
 - `tb2_submit_task.sh`: submission helper.
 - `tb2_update_task.sh`: update helper that prepares upload cleanup and runs `stb submissions update ... --no-send-to-reviewer` with a random 280-350 minute time.
 

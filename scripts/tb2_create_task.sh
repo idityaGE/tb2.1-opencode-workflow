@@ -47,5 +47,5 @@ cd "$repo_root"
 stb init "tasks/$task_name" -p "$TB2_PROJECT_ID" -t "$template"
 
 printf '\nCreated %s\n' "$task_dir"
-printf 'Next: author a hard non-Python implementation task, then run:\n'
+printf 'Next: author a medium or hard non-Python implementation task; prefer hard when viable and validate the hard-rating evidence, then run:\n'
 printf '  .opencode/scripts/tb2_validate_task.sh --task tasks/%s\n' "$task_name"
