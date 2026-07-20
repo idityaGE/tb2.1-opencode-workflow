@@ -62,8 +62,6 @@ Required workflow:
 17. If mode is `full`, run `.opencode/scripts/tb2_validate_task.sh --task tasks/<task_name>` until structural lint passes, NOP fails as required, and oracle passes, or a concrete blocker remains.
 18. Do not choose update time manually; `.opencode/scripts/tb2_update_task.sh` selects a random multiple of 10 between 280 and 350 minutes.
 19. Update with `.opencode/scripts/tb2_update_task.sh --task tasks/<task_name> --submission-id <submission_id>` only after validation passes. The helper runs upload prep. If prep changes files, it stops before upload; validate again and rerun it. If update succeeds, stop and report. If it fails for a non-retryable reason, report the blocker.
-20. Before the final response, show a concise Markdown table with columns `Problem`, `How it was fixed`, `Files changed`, and `Reusable guidance?`.
-21. Ask the user whether to append a concise common-error entry to `.opencode/docs/tb2/update-feedback-guidance.md`. If they agree, add a short bullet under `## Common feedback patterns` using the shape `- Problem: ... Fix: ...`. If they decline, do not edit the guidance file. Skip the question only when there is no concrete reusable problem/fix pair, and say why in the final notes.
 
 Hard rules:
 - Never run update if the applicable validation mode fails.
@@ -75,7 +73,6 @@ Hard rules:
 - Do not modify unrelated tasks or workflow files.
 - Do not hide feedback issues; if something cannot be fixed, report the blocker.
 - Ignore generic AutoEval execution-failed wrapper lines and category-change warnings unless paired with concrete actionable evidence.
-- Do not add feedback-guidance entries without explicit user approval from the end-of-update question.
 
 Final response must be a bit detailed and use this shape:
 ```text
@@ -90,6 +87,5 @@ Final response must be a bit detailed and use this shape:
 - Validation: mode <fast-only|full>, structural <passed|blocked>, alignment <passed|blocked>, metadata <passed|not-applicable|blocked>, ruff <passed|skipped-fast-only|skipped-unavailable|blocked>, NOP <failed-as-required|skipped-fast-only|blocked>, oracle <passed|skipped-fast-only|blocked>
 - Rubric: <not applicable|rewritten and copied with wl-copy|copy blocked|waiting for user-provided platform rubric>
 - Update: <updated with reported time <minutes> --no-send-to-reviewer after <n> attempt(s)|not needed for platform-only rubric|blocked after <n> attempt(s): <reason>>
-- Feedback guidance: <added|declined|skipped> <path and short entry summary, if added>
 - Notes: <remaining blockers or reviewer-relevant details, or none>
 ```
