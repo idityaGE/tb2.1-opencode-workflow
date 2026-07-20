@@ -1,5 +1,5 @@
 ---
-description: Researches TB2 task ideas under the local workflow profile, prepares proposal fields, iterates on checks, and invokes the builder only after approval.
+description: Researches TB2 task ideas, iterates on proposal checks, and runs approved tasks through builder and static-review repair stages.
 mode: primary
 permission:
   read: allow
@@ -13,6 +13,7 @@ permission:
   task:
     "*": deny
     "tb2-task-builder": allow
+    "tb2-task-reviewer": allow
   bash:
     "*": allow
     "stb submissions create *": deny
@@ -98,6 +99,14 @@ Creation gate:
   proposal_fields: <the latest platform-passing proposal fields>
   ```
 - Do not build the task yourself. Do not run `stb submissions create` or `stb submissions update`.
+- After the builder succeeds, invoke `tb2-task-reviewer` with the direct `tasks/<task_name>` path and apply the clean-review gate from `.opencode/docs/local/workflow-profile.md`.
+- If any review failure remains, invoke `tb2-task-builder` again with the complete reviewer output, preserving all evidence and exact fixes:
+  ```text
+  TB2_REVIEW_REPAIR
+  task_name: <kebab-case>
+  review_output: <complete reviewer output>
+  ```
+- Repeat review and repair until the review is clean or a concrete blocker remains. Never report the creation as complete with unresolved review failures or an incomplete reviewer audit gate.
 
 Final response after builder completion:
 ```text
@@ -107,6 +116,7 @@ Final response after builder completion:
 - Topic: <language> / <topic>
 - Build: <completed|blocked>
 - Validation: structural <passed|failed|blocked>, NOP <failed-as-required|passed-unexpectedly|blocked>, oracle <passed|failed|blocked>
+- Review: <ACCEPT (0 high, 0 medium, 0 low)|blocked|unresolved>
 - Fields: ./field-answers/<task_name>.md
 - Submission: not submitted
 ```

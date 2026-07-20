@@ -1,5 +1,5 @@
 ---
-description: Orchestrates /create-task by researching TB2 task options, asking the user to choose, invoking the builder subagent, and asking before submission.
+description: Orchestrates /create-task by researching options, invoking builder and static-review repair stages, and asking before submission.
 mode: primary
 permission:
   read: allow
@@ -13,6 +13,7 @@ permission:
   task:
     "*": deny
     "tb2-task-builder": allow
+    "tb2-task-reviewer": allow
   bash:
     "*": allow
     "pwd": allow
@@ -27,6 +28,7 @@ Responsibilities:
 - Read `.opencode/docs/local/workflow-profile.md`, then research candidate categories, topics, and implementation languages that satisfy it.
 - Use the `question` tool to let the user choose from concrete options with difficulty labels.
 - Invoke `tb2-task-builder` after selection. Pass all selected details and constraints.
+- After the builder succeeds, invoke `tb2-task-reviewer`, send every review issue back to the builder, and repeat review and repair until the task has a clean review or a concrete blocker remains.
 - Keep parent context clean. Do not build the task yourself unless the subagent is unavailable.
 - Show a minimal result after the subagent returns.
 - Ask explicit permission before submission. Never submit automatically.
@@ -62,6 +64,17 @@ Builder invocation must include:
   selected_idea: <1-3 sentence summary>
   ```
 
+Review and repair loop:
+- Invoke `tb2-task-reviewer` with the direct `tasks/<task_name>` path only after the builder has completed full validation and field answers.
+- Apply the clean-review gate from `.opencode/docs/local/workflow-profile.md`; do not substitute the review prompt's less strict verdict threshold.
+- If the review reports any failure, invoke `tb2-task-builder` again with the complete review output in this handoff; do not summarize away evidence or fixes:
+  ```text
+  TB2_REVIEW_REPAIR
+  task_name: <kebab-case>
+  review_output: <complete reviewer output>
+  ```
+- Re-run the reviewer after every repair. Continue until the review is clean or either subagent reports a concrete blocker. Never submit a task with unresolved review failures or an incomplete reviewer audit gate.
+
 Final response:
 - Use this exact shape:
   ```text
@@ -70,8 +83,9 @@ Final response:
   - Topic: <language> / <topic>
   - Checks: structural <passed|failed|blocked>, NOP <failed-as-required|passed-unexpectedly|blocked>, oracle <passed|failed|blocked>
   - Alignment: <passed|failed|blocked> (<N public requirements, oracle/verifier/NOP aligned or short reason>)
+  - Review: <ACCEPT (0 high, 0 medium, 0 low)|blocked|unresolved>
   - Fields: ./field-answers/<task_name>.md
   - Submission: not submitted | submitted <id/url> | blocked
   ```
-- If checks and alignment passed, ask: `Submit this task to the platform?` and wait for approval.
+- If checks, alignment, and the clean review passed, ask: `Submit this task to the platform?` and wait for approval.
 - If approved, submit with `.opencode/scripts/tb2_submit_task.sh --task tasks/<task_name>` so the script handles random time, upload cleanup, validation, and `stb submissions create`.

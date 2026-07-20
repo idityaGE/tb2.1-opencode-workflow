@@ -92,6 +92,7 @@ synchronized_on = "not-applicable"
 upstream_root = "local"
 files = [
   "local/instruction-authoring.md",
+  "local/terminal-bench-e2-review-prompt.md",
   "local/update-feedback-guidance.md",
   "local/workflow-profile.md",
 ]

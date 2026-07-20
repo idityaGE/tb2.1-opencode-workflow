@@ -15,6 +15,7 @@ These are net-new creation constraints. During `/update-task`, preserve valid gr
 ## Validation profile
 
 - New tasks use create context: run preflight and then full structural, ruff, NOP, and oracle validation.
+- After full validation, new tasks must pass the static review in `terminal-bench-e2-review-prompt.md`. A clean review requires `VERDICT: ACCEPT` with zero high, medium, and low failures; `NEEDS-DATA` items do not block creation. Send every failure to the builder and repeat full validation and static review until clean or concretely blocked.
 - Revisions use revision context. Ask `tb2_task_state.sh` for the validation mode. `fast-only` is limited to root `instruction.md` and/or `task.toml` changes against unchanged runtime files; all runtime-affecting changes use full validation.
 - NOP must earn 0 because required behavior is absent, not because infrastructure failed. Oracle must earn 1 against the same verifier.
 - `.opencode/scripts/tb2_task_lint.py` and `.opencode/scripts/tb2_metadata.py` enforce mechanical policy. Skills own semantic review; agents only sequence those checks and report their outcomes.

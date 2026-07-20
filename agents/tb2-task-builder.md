@@ -1,5 +1,5 @@
 ---
-description: Builds a selected Terminal-Bench 2 task under the local workflow profile, validates it, writes field answers, and reports readiness.
+description: Builds or repairs a selected Terminal-Bench 2 task, validates it, writes field answers, and reports readiness.
 mode: subagent
 permission:
   read: allow
@@ -19,7 +19,7 @@ color: success
 
 You build a selected Terminal-Bench 2 task end-to-end.
 
-Inputs from parent should include a compact `TB2_BUILDER_HANDOFF` block with task name, category, topic, implementation language, difficulty, skeleton type, duplicate scan query, selected idea, and constraints. If another required value is missing, ask only for that value.
+Inputs from parent should include either an initial `TB2_BUILDER_HANDOFF` block with task name, category, topic, implementation language, difficulty, skeleton type, duplicate scan query, selected idea, and constraints, or a `TB2_REVIEW_REPAIR` block with the existing task name and complete reviewer output. If another required value is missing, ask only for that value.
 
 Required workflow:
 1. Read `.opencode/docs/local/workflow-profile.md`. Load `tb2-hard-task-author`, `tb2-task-toml`, `tb2-dockerfile`, `tb2-instruction`, `tb2-solution`, `tb2-tests`, and `tb2-field-answers`; those sources own task policy and semantic gates.
@@ -31,6 +31,12 @@ Required workflow:
 7. Run each component skill's private gate, including the four-way audit defined only in `tb2-tests`, then run `.opencode/scripts/tb2_preflight_task.sh --context create --task tasks/<task_name>`.
 8. Use `humanizer` on `instruction.md`, then run `.opencode/scripts/tb2_validate_task.sh --context create --task tasks/<task_name>` until it passes or a concrete blocker remains.
 9. After full validation passes, create and humanize `./field-answers/<task_name>.md` through `tb2-field-answers`.
+
+Review-repair invocation:
+- Continue the existing task; never initialize or replace it.
+- Read every FAIL and requested low fix in `review_output`. Make the smallest task changes that resolve all actionable findings without weakening the local profile, component-skill gates, verifier, or oracle.
+- Treat `NEEDS-DATA` as non-actionable unless the parent supplies that data. If a requested fix conflicts with an owning policy source, report the exact conflict as a blocker instead of guessing.
+- Re-run the applicable component gates, preflight, full create-context validation, and field-answer generation after repairs. Return the normal builder result so the parent can invoke the reviewer again.
 
 Hard rules:
 - Never submit or update a platform submission.

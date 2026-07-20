@@ -17,6 +17,7 @@ Primary opencode files:
 - `.opencode/agents/tb2-task-orchestrator.md`: follows the local workflow profile, researches options, asks the user, invokes builder, asks before submission.
 - `.opencode/agents/tb2-task-proposer.md`: follows the local workflow profile, prints platform fields, iterates on four proposal checks, and invokes builder only after all pass and the user approves.
 - `.opencode/agents/tb2-task-builder.md`: creates layered hidden-bug task files, uses component skills, validates structural/NOP/oracle behavior, writes humanized field answers.
+- `.opencode/agents/tb2-task-reviewer.md`: statically applies the local Edition 2 review prompt and returns evidence-backed findings for builder repair.
 - `.opencode/agents/tb2-task-updater.md`: fetches submission feedback, fixes concrete task issues, uses fast structural/alignment/metadata checks for instruction.md and/or task.toml-only edits or full NOP/oracle validation for runtime-affecting edits, and updates without sending to reviewer.
 - `.opencode/agents/tb2-workflow-maintainer.md`: modifies workflow infrastructure.
 - `.opencode/plugins/tb2-task-hooks.ts`: opencode plugin hook for fast post-edit structural TB2 checks.
@@ -48,11 +49,12 @@ Update-only feedback scripts:
 1. User runs `/create-task`.
 2. `tb2-task-orchestrator` applies `.opencode/docs/local/workflow-profile.md`, uses compact skill context plus focused existing-task inspection, presents options through `question`, then invokes `tb2-task-builder`.
 3. `tb2-task-builder` initializes and authors the layered hidden-bug task, uses component skills instead of bulk doc reads, validates, and writes humanized field answers.
-4. Parent reports a compact result and asks before platform submission.
-5. `tb2-task-hooks.ts` runs fast post-edit structural checks on task-file modifications; full ruff/NOP/oracle validation stays in `tb2_validate_task.sh`.
-6. User runs `/update-task <submission_id>`.
-7. `tb2-task-updater` fetches feedback, summarizes issues, fixes the matching local task, uses structural/alignment/metadata checks without NOP/oracle for instruction.md and/or task.toml-only changes, otherwise validates structural/NOP/oracle behavior, and runs the update helper only after the applicable validation passes; the helper chooses a random 280-350 minute update time and uses `--no-send-to-reviewer`.
-8. `/task-proposal` applies the local profile, emits proposal fields in chat, revises them from platform feedback until all four checks pass, then creates the selected task only after explicit user approval.
+4. The parent invokes `tb2-task-reviewer`, sends all static review findings to the builder, and repeats repair and review until clean or blocked.
+5. Parent reports a compact result and asks before platform submission only after a clean review.
+6. `tb2-task-hooks.ts` runs fast post-edit structural checks on task-file modifications; full ruff/NOP/oracle validation stays in `tb2_validate_task.sh`.
+7. User runs `/update-task <submission_id>`.
+8. `tb2-task-updater` fetches feedback, summarizes issues, fixes the matching local task, uses structural/alignment/metadata checks without NOP/oracle for instruction.md and/or task.toml-only changes, otherwise validates structural/NOP/oracle behavior, and runs the update helper only after the applicable validation passes; the helper chooses a random 280-350 minute update time and uses `--no-send-to-reviewer`.
+9. `/task-proposal` applies the local profile, emits proposal fields in chat, revises them from platform feedback until all four checks pass, then runs builder/reviewer repair only after explicit user approval.
 
 ## Safe Modification Rules
 
