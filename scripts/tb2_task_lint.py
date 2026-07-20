@@ -44,9 +44,9 @@ def load_category_policy(path: Path) -> tuple[frozenset[str], frozenset[str]]:
 ALLOWED_CATEGORIES, BLOCKED_CATEGORIES = load_category_policy(TAXONOMY_PATH)
 ALLOWED_DIFFICULTIES = ("hard", "medium")
 BLOCKED_INSTRUCTION_PATTERNS = {
-    r"\bfix (?:the )?bugs?\b": "debugging/software-engineering",
+    r"\b(?:fix|repair|debug|patch)(?:s|es|ed|ing)?\b": "debugging/software-engineering",
+    r"\bfailing[- ]tests?\b": "debugging/software-engineering",
     r"\bimplement missing logic\b": "software-engineering",
-    r"\brepair (?:this |the )?(?:app|application|codebase)\b": "debugging/software-engineering",
     r"\bmake (?:the )?tests pass\b": "debugging/software-engineering",
     r"\bparse files?\b": "data-processing",
     r"\btransform data\b": "data-processing",
@@ -100,9 +100,11 @@ DOC_HELP_FILE_NAMES = {
     "walkthrough.txt",
 }
 DOC_HELP_SUFFIXES = {".adoc", ".md", ".rst"}
-ALLOWED_ENVIRONMENT_READMES = {"environment/README.md"}
-ALLOWED_ENVIRONMENT_SPECS = {"environment/spec.md", "environment/rule.md"}
-ALLOWED_ENVIRONMENT_CONTRACTS = ALLOWED_ENVIRONMENT_READMES | ALLOWED_ENVIRONMENT_SPECS
+ALLOWED_ENVIRONMENT_README_NAMES = {"README.md"}
+ALLOWED_ENVIRONMENT_SPEC_NAMES = {"spec.md", "rule.md"}
+ALLOWED_ENVIRONMENT_CONTRACT_NAMES = (
+    ALLOWED_ENVIRONMENT_README_NAMES | ALLOWED_ENVIRONMENT_SPEC_NAMES
+)
 CANONICAL_IMAGES = {
     "public.ecr.aws/docker/library/python:3.13-slim-bookworm@sha256:01f42367a0a94ad4bc17111776fd66e3500c1d87c15bbd6055b7371d39c124fb",
     "public.ecr.aws/docker/library/node:22-bookworm-slim@sha256:f3a68cf41a855d227d1b0ab832bed9749469ef38cf4f58182fb8c893bc462383",
@@ -311,10 +313,12 @@ def check_instruction_prompt(path: Path) -> None:
     if len(paragraphs) > 3:
         fail(f"{path}: instruction has {len(paragraphs)} paragraphs; use at most 3")
     words = len(text.split())
-    if words > 250:
-        fail(f"{path}: prompt is {words} words; it must stay at or below 250")
-    elif words > 200:
-        warn(f"{path}: prompt is {words} words; around 200 is preferred")
+    if words > 300:
+        fail(f"{path}: prompt is {words} words; it must stay at or below 300")
+    elif words > 250:
+        warn(f"{path}: prompt is {words} words; 180-250 is preferred")
+    elif words < 150:
+        warn(f"{path}: prompt is {words} words; 180-250 is preferred when the contract permits")
 
 
 def check_category(path: Path, category: str) -> None:
@@ -350,16 +354,25 @@ def expected_codebase_size(file_count: int) -> str:
 
 def check_no_solver_helper_docs(task: Path) -> None:
     """Block helper docs while allowing narrowly shaped environment contracts."""
-    contracts = [task / relative for relative in ALLOWED_ENVIRONMENT_CONTRACTS if (task / relative).exists()]
-    specs = [task / relative for relative in ALLOWED_ENVIRONMENT_SPECS if (task / relative).exists()]
+    contracts = [
+        path
+        for path in task.rglob("*")
+        if path.is_file()
+        and path.relative_to(task).parts[0] == "environment"
+        and path.name in ALLOWED_ENVIRONMENT_CONTRACT_NAMES
+    ]
+    readmes = [path for path in contracts if path.name in ALLOWED_ENVIRONMENT_README_NAMES]
+    specs = [path for path in contracts if path.name in ALLOWED_ENVIRONMENT_SPEC_NAMES]
+    if len(readmes) > 1:
+        fail(f"{task}: use at most one agent-visible README.md under environment/")
     if len(specs) > 1:
-        fail(f"{task}: use at most one normative environment contract: spec.md or rule.md")
+        fail(f"{task}: use at most one agent-visible normative contract: spec.md or rule.md")
 
     for path in task.rglob("*"):
         if path.name == "instruction.md":
             continue
         relative = path.relative_to(task)
-        if relative.as_posix() in ALLOWED_ENVIRONMENT_CONTRACTS:
+        if path in contracts:
             if path.is_symlink() or not path.is_file():
                 fail(f"{task}: environment contract must be a regular file: {relative}")
             elif not path.read_text(errors="replace").strip():
@@ -388,8 +401,8 @@ def check_no_solver_helper_docs(task: Path) -> None:
                 f"by an absolute in-container path ending in {contract.name}"
             )
         warn(
-            f"{contract}: semantic review must confirm necessity or reviewer request, "
-            "declarative no-hint content, realistic style, instruction sufficiency, and test coverage"
+            f"{contract}: semantic review must confirm Docker exposes this file at the cited path, "
+            "declarative no-hint content, realistic domain framing, instruction sufficiency, and test coverage"
         )
 
 
