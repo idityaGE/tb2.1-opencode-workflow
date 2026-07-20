@@ -126,8 +126,8 @@ Bad failures: Ambiguous requirements, environment issues
 ### To Make Harder:
 
 - Add more steps
-- Include hidden requirements
-- Use niche knowledge
+- Add publicly specified edge cases and non-obvious interactions
+- Use specialized knowledge only when the required rules are public
 - Create debugging scenarios
 - Add edge cases
 
@@ -136,7 +136,6 @@ Bad failures: Ambiguous requirements, environment issues
 - Reduce step count
 - Make requirements more explicit
 - Use common technologies
-- Provide more hints in instructions
 - Simplify the environment
 
 ---

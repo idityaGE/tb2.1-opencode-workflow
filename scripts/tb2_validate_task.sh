@@ -10,9 +10,9 @@ usage() {
 Usage: tb2_validate_task.sh --task TASK_DIR
 
 Runs structural lint, ruff, NOP, and oracle checks. NOP must earn reward 0 and
-oracle must earn reward 1. On success, records a small runtime-file validation
+oracle must earn reward 1. On success, records a small runtime validation
 baseline used by update-task to avoid repeated full runs after instruction.md or
-task.toml-only edits.
+metadata-only task.toml edits.
 EOF
 }
 
@@ -146,13 +146,7 @@ baseline_dir="$repo_root/.opencode/cache/tb2-validation"
 mkdir -p "$baseline_dir"
 task_rel="$(tb2_task_rel_path "$task_path")"
 baseline_file="$baseline_dir/$(basename "$task_path").runtime.sha256"
-git ls-files -co --exclude-standard -- "$task_rel" |
-  while IFS= read -r file_path; do
-    if ! tb2_is_fast_validation_path "$file_path"; then
-      printf '%s\0' "$file_path"
-    fi
-  done |
-  xargs -0 -r sha256sum > "$baseline_file"
+tb2_emit_runtime_validation_baseline "$task_rel" > "$baseline_file"
 
 printf '\nValidation completed for %s\n' "$task_path"
 printf 'Validation baseline: %s\n' "$baseline_file"

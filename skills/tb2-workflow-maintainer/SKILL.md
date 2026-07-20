@@ -17,7 +17,7 @@ Primary opencode files:
 - `.opencode/agents/tb2-task-orchestrator.md`: researches only medium or hard non-Python multi-step hidden-bug task options, asks the user, invokes builder, asks before submission.
 - `.opencode/agents/tb2-task-proposer.md`: researches medium or hard non-Python proposals, prints platform fields, iterates on four proposal checks, and invokes builder only after all pass and the user approves.
 - `.opencode/agents/tb2-task-builder.md`: creates layered hidden-bug task files, uses component skills, validates structural/NOP/oracle behavior, writes humanized field answers.
-- `.opencode/agents/tb2-task-updater.md`: fetches submission feedback, fixes concrete task issues, uses fast structural/alignment/metadata checks for instruction.md and/or task.toml-only edits or full NOP/oracle validation for runtime-affecting edits, and updates without sending to reviewer.
+- `.opencode/agents/tb2-task-updater.md`: fetches submission feedback, fixes concrete task issues, uses fast structural/alignment/metadata checks only when a valid full-validation runtime baseline exists and edits are limited to instruction.md and/or allowlisted metadata-only task.toml keys, otherwise uses full NOP/oracle validation, and updates without sending to reviewer.
 - `.opencode/agents/tb2-workflow-maintainer.md`: modifies workflow infrastructure.
 - `.opencode/plugins/tb2-task-hooks.ts`: opencode plugin hook for fast post-edit structural TB2 checks.
 - `.opencode/skills/tb2-*/SKILL.md`: component workflow guidance.
@@ -47,7 +47,7 @@ Update-only feedback scripts:
 4. Parent reports a compact result and asks before platform submission.
 5. `tb2-task-hooks.ts` runs fast post-edit structural checks on task-file modifications; full ruff/NOP/oracle validation stays in `tb2_validate_task.sh`.
 6. User runs `/update-task <submission_id>`.
-7. `tb2-task-updater` fetches feedback, summarizes issues, fixes the matching local task, uses structural/alignment/metadata checks without NOP/oracle for instruction.md and/or task.toml-only changes, otherwise validates structural/NOP/oracle behavior, and runs the update helper only after the applicable validation passes; the helper chooses a random 280-350 minute update time and uses `--no-send-to-reviewer`.
+7. `tb2-task-updater` fetches feedback, summarizes issues, fixes the matching local task, uses structural/alignment/metadata checks without NOP/oracle only when a valid full-validation runtime baseline exists and edits are limited to instruction.md and/or allowlisted metadata-only task.toml keys, otherwise validates structural/NOP/oracle behavior, and runs the update helper only after the applicable validation passes; the helper chooses a random 280-350 minute update time and uses `--no-send-to-reviewer`.
 8. `/task-proposal` researches and presents medium or hard non-Python task options, emits proposal fields in chat, revises them from platform feedback until all four checks pass, then creates the selected task only after explicit user approval.
 
 ## Safe Modification Rules
