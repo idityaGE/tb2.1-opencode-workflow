@@ -39,10 +39,11 @@ Rules:
 - Keep category alignment true when the prompt, environment, tests, and expected deliverable are read together; follow the taxonomy source rather than keyword substitution.
 
 Sufficiency and difficulty guidance:
-- Make the task fully specified while making the implementation/debugging path genuinely deep.
-- Specify behavior, invariants, schemas, formats, and outputs; do not specify repair steps, bug files, or solution approach.
+- Make the task fully specified while making the implementation/debugging path genuinely deep. Publicly define outputs, schemas, invariants, ordering, errors, and edge semantics, but keep broken files, functions, defects, algorithms, and repair steps out of agent-visible text unless an identifier is itself part of the public contract.
+- Hide inputs, not rules. Hidden tests may use larger, cyclic, reordered, malformed, or deterministically generated same-schema inputs, but every rule they enforce must already be stated in `instruction.md` or an explicitly referenced public contract.
 - Keep `instruction.md` as the human prompt only and follow `tb2-instruction` plus `.opencode/docs/tb2/instruction-authoring.md`. Agent-visible README/spec/rule files may contain realistic context, interfaces, and detailed normative protocol, schema, format, or domain rules. None may contain task-specific repair steps, diagnostics, execution order, bug locations, suggested fixes, seeded-case answers, known-issue lists, common pitfalls, or verifier-shaped edge-case catalogs.
-- Prefer non-local failure chains across parser/state/build/runtime layers so fixes require tracing interactions.
+- Prefer non-local failure chains across parser/state/build/runtime layers so fixes require tracing interactions and no single local patch can solve the task.
+- Build difficulty from one or more natural load-bearing interactions such as recovery/replay ordering, cyclic dependency or state graphs, transaction rollback and persistence, concurrency or scheduling invariants, numeric precision and stability, canonicalization with coupled tie-breaks, or cross-file/cross-artifact consistency. Do not add these mechanisms decoratively; each selected interaction must affect the required result and verifier.
 - Use natural edge cases implied by the contract, such as boundaries, empty inputs, duplicates, interrupted checkpoints, ordering ties, malformed-but-recoverable records, restart/replay, or numeric stability cases.
 - Make hardcoding difficult with deterministic generated cases, multiple fixtures, semantic invariants, and independent reference checkers.
 - Require the agent to derive and preserve a system invariant such as prefix safety, conservation, ordering, idempotence, replay determinism, or representation validity.
@@ -58,6 +59,6 @@ Red flags:
 First-go hardness gates:
 - Before authoring, make a private difficulty blueprint: bug layers, why agents miss them, evidence trail, oracle repair path, duplicate-risk note, and a defect-to-verifier map showing that each hidden layer can independently affect score. For each approved environment document, record why it is necessary or the exact reviewer request, what realistic role it serves, and why it does not expose the debugging path.
 - Reject or redesign ideas that are single-bug, grep-and-patch, prompt-following, instruction-volume hard, brittle-output-only, hardcode-friendly, or near-duplicate.
-- Require at least 3 interacting hidden defects or failure modes, including one non-local bug and one non-happy-path edge case.
+- Require at least 3 interacting hidden defects or failure modes, including one non-local bug and one stateful or non-happy-path failure. Reject the design if a single local patch can satisfy the complete contract.
 - Before full validation, complete the private bidirectional coverage audit from `tb2-tests` with zero uncovered requirements and zero ungrounded tested behaviors. Also self-check that NOP should fail, oracle should pass, every hidden layer is verifier-relevant, the prompt and any approved contract have no hints, Docker is compliant, duplicate scan is clean, and the solution derives the repair.
 - Do not choose submission time manually; `.opencode/scripts/tb2_submit_task.sh` selects a random multiple of 10 between 280 and 350 minutes.
