@@ -73,8 +73,9 @@ Final response:
   - Task: tasks/<task_name>
   - Topic: <language> / <topic>
   - Checks: structural <passed|failed|blocked>, NOP <failed-as-required|passed-unexpectedly|blocked>, oracle <passed|failed|blocked>
+  - Alignment: <passed|failed|blocked> (<N public requirements, oracle/verifier/NOP aligned or short reason>)
   - Fields: ./field-answers/<task_name>.md
   - Submission: not submitted | submitted <id/url> | blocked
   ```
-- If checks passed, ask: `Submit this task to the platform?` and wait for approval.
+- If checks and alignment passed, ask: `Submit this task to the platform?` and wait for approval.
 - If approved, submit with `.opencode/scripts/tb2_submit_task.sh --task tasks/<task_name>` so the script handles random time, upload cleanup, validation, and `stb submissions create`.
