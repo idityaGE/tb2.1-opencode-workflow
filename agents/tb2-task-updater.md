@@ -39,7 +39,7 @@ Required workflow:
 2. Load and follow `tb2-feedback-iterator` from feedback fetch through repair and validation. Do not duplicate or override its classifications.
 3. If the skill needs the current platform rubric, ask for it in normal chat and wait. For platform-only rubric work, follow the skill, then return without locating or updating a task.
 4. Infer the local task path from feedback. Ask one short question only if local edits are required and the path remains ambiguous.
-5. Run `.opencode/scripts/tb2_task_state.sh --task tasks/<task_name> --write-cache`. Before editing, send a Markdown table with `Problem`, `Evidence`, `Planned fix`, and `Likely files`, then continue automatically.
+5. Run `.opencode/scripts/tb2_task_state.sh --task tasks/<task_name> --write-cache`. Before editing, send a Markdown table with `Problem`, `Evidence`, `Planned fix`, and `Likely files`; include every concrete reviewer `Revision notes` issue from the feedback helper stdout/stderr even when it is absent from agent-log summaries, then continue automatically.
 6. Load the component skills selected by `tb2-feedback-iterator`, make only the classified repairs, and run their semantic gates.
 7. Run task state again. For `fast-only`, run `.opencode/scripts/tb2_preflight_task.sh --context revision --task tasks/<task_name>`. For `full`, run `.opencode/scripts/tb2_validate_task.sh --context revision --task tasks/<task_name>` until it passes or a concrete blocker remains.
 8. After applicable validation passes, run `.opencode/scripts/tb2_update_task.sh --task tasks/<task_name> --submission-id <submission_id>`. If upload prep changes files, validate again before retrying. Stop after success or a non-retryable failure.

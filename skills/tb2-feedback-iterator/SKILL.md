@@ -9,11 +9,11 @@ Use after platform or CI feedback is available, especially from `/update-task <s
 
 ## Classification policy
 
-- Fetch with `.opencode/scripts/tb2_status_iterate.sh --submission-id <submission_id>`. If it prints a `Feedback directory:`, inspect that directory before classifying anything.
-- Treat concrete reviewer notes, quality/CI/LLMaJ findings, downloaded artifacts, rubric findings, and NOP/oracle or agent-run evidence as actionable.
+- Fetch with `.opencode/scripts/tb2_status_iterate.sh --submission-id <submission_id>`. Inspect its full stdout/stderr as feedback evidence, especially any `Revision notes` section, then inspect the `Feedback directory:` if one is printed before classifying anything.
+- Treat concrete reviewer notes, including stdout/stderr `Revision notes`, quality/CI/LLMaJ findings, downloaded artifacts, rubric findings, and NOP/oracle or agent-run evidence as actionable.
 - Ignore a generic AutoEval execution-failed summary only after the feedback directory contains no concrete evidence behind it.
 - Ignore category-change warnings unless the user explicitly asks to change category. The revision profile preserves valid grandfathered category, language, difficulty, and milestone metadata.
-- Classify every actionable item before editing and summarize the evidence. Do not hide an issue that cannot be repaired.
+- Classify every actionable item before editing and summarize the evidence. Every concrete issue from reviewer `Revision notes` must appear in the pre-edit `Problem` table even if agent-log summaries or downloaded files do not repeat it. Do not hide an issue that cannot be repaired.
 
 ## Repair policy
 
