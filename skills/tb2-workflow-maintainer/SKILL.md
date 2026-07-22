@@ -20,9 +20,8 @@ Primary opencode files:
 - `.opencode/agents/tb2-task-reviewer.md`: statically applies the local Edition 2 review prompt and returns evidence-backed findings for builder repair.
 - `.opencode/agents/tb2-task-updater.md`: fetches submission feedback, fixes concrete task issues, uses fast structural/alignment/metadata checks for instruction.md and/or task.toml-only edits or full NOP/oracle validation for runtime-affecting edits, and updates without sending to reviewer.
 - `.opencode/agents/tb2-workflow-maintainer.md`: modifies workflow infrastructure.
-- `.opencode/plugins/tb2-task-hooks.ts`: opencode plugin hook for fast post-edit structural TB2 checks.
 - `.opencode/skills/tb2-*/SKILL.md`: component workflow guidance.
-- `.opencode/scripts/*`: execution backend scripts for create, validate, hooks, submit, and update-only feedback handling.
+- `.opencode/scripts/*`: execution backend scripts for create, validate, submit, and update-only feedback handling.
 - `.opencode/docs/policy-sources.toml`: copied/local source classification, precedence, upstream path, sync date, and documented overlays.
 - `.opencode/docs/local/**`: local workflow profile and authoring notes.
 - `.opencode/docs/tb2/**`: copied current-status, normative, advisory, and historical TB2 sources.
@@ -34,7 +33,6 @@ Create-task backend scripts:
 - `tb2_task_lint.py`: structural task lint.
 - `tb2_metadata.py`: canonical task.toml schema/defaults, category status, platform labels, subcategories, size bands, and metadata summary.
 - `tb2_task_state.sh`: prints and optionally caches compact deterministic task state so agents do not spend tokens manually classifying changed files, metadata, instruction length, or validation scope.
-- `tb2_hook_task_check.sh`: fast post-edit structural hook wrapper for one task.
 - `tb2_copy_field_answers.sh`: copies a full field-answer file or a single section without interactive pauses.
 - `tb2_prepare_upload.sh`: validates that the target is a direct `tasks/<task>` folder, removes generated `__pycache__` directories, and deletes only the generated root-level `<task>.zip` archive before validation, submission, or update upload.
 - `tb2_submit_task.sh`: submission helper.
@@ -51,10 +49,9 @@ Update-only feedback scripts:
 3. `tb2-task-builder` initializes and authors the layered hidden-bug task, uses component skills instead of bulk doc reads, validates, and writes humanized field answers.
 4. The parent invokes `tb2-task-reviewer`, sends all static review findings to the builder, and repeats repair and review until clean or blocked.
 5. Parent reports a compact result and asks before platform submission only after a clean review.
-6. `tb2-task-hooks.ts` runs fast post-edit structural checks on task-file modifications; full ruff/NOP/oracle validation stays in `tb2_validate_task.sh`.
-7. User runs `/update-task <submission_id>`.
-8. `tb2-task-updater` fetches feedback, summarizes issues, fixes the matching local task, uses structural/alignment/metadata checks without NOP/oracle for instruction.md and/or task.toml-only changes, otherwise validates structural/NOP/oracle behavior, and runs the update helper only after the applicable validation passes; the helper chooses a random 280-350 minute update time and uses `--no-send-to-reviewer`.
-9. `/task-proposal` applies the local profile, emits proposal fields in chat, revises them from platform feedback until all four checks pass, then runs builder/reviewer repair only after explicit user approval.
+6. User runs `/update-task <submission_id>`.
+7. `tb2-task-updater` fetches feedback, summarizes issues, fixes the matching local task, uses structural/alignment/metadata checks without NOP/oracle for instruction.md and/or task.toml-only changes, otherwise validates structural/NOP/oracle behavior, and runs the update helper only after the applicable validation passes; the helper chooses a random 280-350 minute update time and uses `--no-send-to-reviewer`.
+8. `/task-proposal` applies the local profile, emits proposal fields in chat, revises them from platform feedback until all four checks pass, then runs builder/reviewer repair only after explicit user approval.
 
 ## Safe Modification Rules
 
