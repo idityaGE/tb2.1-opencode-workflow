@@ -52,21 +52,23 @@ Hard rules:
 - Do not modify unrelated tasks or workflow files.
 - Do not reinterpret feedback policy in this agent; report any unresolved classification or repair blocker.
 
-Final response must be a bit detailed and use this shape:
+Final response must put the platform outcome and notes first. Use `SUCCESS` only after the update helper succeeds, `BLOCKED` when the submission was not updated because of a failure, `WAITING` when required user input is missing, and `NO UPDATE NEEDED` for platform-only work. Keep the summary concise and combine validation results on one line. Include `Hardening` only when requested or performed, `Instruction sufficiency` and `Alignment audit` when task files were assessed, and `Rubric` only for rubric work.
+
+Use this shape:
 ```text
-## Update Result
+## Update Result: <SUCCESS|BLOCKED|WAITING|NO UPDATE NEEDED>
+
+- Notes: <None|the blocker, required user action, or reviewer-relevant detail>
 - Submission: <submission_id>
-- Task: tasks/<task_name>|not needed for platform-only rubric
-- Feedback: <concrete issues found, not generic wrapper noise>
-- Fix plan followed: <brief summary of the table/action plan>
-- Problem/fix details: <concrete problem -> how it was fixed>
-- Files changed: <files and what changed>
-- Hardening: <not requested|major hardening performed with brief task-shape evidence|blocked: reason>
+- Task: tasks/<task_name>|not needed for platform-only work
+
+### Summary
+- Platform update: <successful with reported time <minutes> and --no-send-to-reviewer after <n> attempt(s)|not attempted: reason|not needed: reason>
+- Changes: <brief concrete problem -> fix summary>
+- Validation: <fast-only|full> — structural <result>, alignment <result>, metadata <result>, ruff <result>, NOP <result>, oracle <result>
+- Files: <changed files and purpose|none>
+- Hardening: <major hardening and structural evidence|blocked: reason>
 - Instruction sufficiency: <passed with all tested behavior publicly grounded|blocked: reason>
-- Difficulty evidence: <structural hardening evidence; local real-agent evaluation not run>
-- Alignment audit: <N public requirements, 0 oracle omissions, 0 uncovered, 0 ungrounded tests, NOP meaningful|failed|blocked>
-- Validation: mode <fast-only|full>, structural <passed|blocked>, alignment <passed|blocked>, metadata <passed|not-applicable|blocked>, ruff <passed|skipped-fast-only|skipped-unavailable|blocked>, NOP <failed-as-required|skipped-fast-only|blocked>, oracle <passed|skipped-fast-only|blocked>
-- Rubric: <not applicable|rewritten and copied with wl-copy|copy blocked|waiting for user-provided platform rubric>
-- Update: <updated with reported time <minutes> --no-send-to-reviewer after <n> attempt(s)|not needed for platform-only rubric|blocked after <n> attempt(s): <reason>>
-- Notes: <remaining blockers or reviewer-relevant details, or none>
+- Alignment audit: <N requirements, 0 oracle omissions, 0 uncovered, 0 ungrounded tests, NOP meaningful|failed|blocked>
+- Rubric: <rewritten and copied|copy blocked|waiting for user text>
 ```
