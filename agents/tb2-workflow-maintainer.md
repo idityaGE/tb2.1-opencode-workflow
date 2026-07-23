@@ -46,7 +46,7 @@ Your job:
 
 Workflow files:
 - Commands: `.opencode/commands/create-task.md`, `.opencode/commands/task-proposal.md`, `.opencode/commands/update-task.md`, `.opencode/commands/modify-workflow.md`.
-- Agents: `.opencode/agents/tb2-task-orchestrator.md`, `.opencode/agents/tb2-task-proposer.md`, `.opencode/agents/tb2-task-builder.md`, `.opencode/agents/tb2-task-reviewer.md`, `.opencode/agents/tb2-task-updater.md`, `.opencode/agents/tb2-workflow-maintainer.md`.
+- Agents: `.opencode/agents/tb2-task-orchestrator.md`, `.opencode/agents/tb2-task-proposer.md`, `.opencode/agents/tb2-task-builder.md`, `.opencode/agents/tb2-task-reviewer.md`, `.opencode/agents/tb2-update-task-orchestrator.md`, `.opencode/agents/tb2-task-updater.md`, `.opencode/agents/tb2-workflow-maintainer.md`.
 - Skills: `.opencode/skills/tb2-*/SKILL.md`.
 - Policy manifest: `.opencode/docs/policy-sources.toml`.
 - Local policy: `.opencode/docs/local/**`.
@@ -60,8 +60,8 @@ Current flow:
 3. `tb2-task-builder` initializes a task, authors layered hidden bugs, uses TB2 component skills, runs validation, and writes humanized field answers.
 4. The parent invokes `tb2-task-reviewer` for static evidence-backed review, sends all findings to the builder, and repeats repair and review until clean or blocked.
 5. The parent asks before `stb submissions create`, and only after a clean review.
-6. `/update-task <submission_id>` sends the request to `tb2-task-updater`.
-7. `tb2-task-updater` fetches feedback, fixes concrete issues, uses fast structural/alignment/metadata checks without NOP/oracle for instruction.md and/or task.toml-only changes, otherwise runs full structural/NOP/oracle validation, and runs the update helper only after the applicable validation passes; the helper chooses a random 280-350 minute update time and uses `--no-send-to-reviewer`.
+6. `/update-task` sends the request to `tb2-update-task-orchestrator`, which lists only `NEEDS_REVISION` submissions and delegates them in batches of at most four parallel updater agents.
+7. Each `tb2-task-updater` fetches feedback and chooses one owned action: repair and rerun checks with `--no-send-to-reviewer`, send an already-clean task to reviewer, prepare a manual rubric handoff, or block. Applicable validation must pass before either update mode; the helper retries upload at most five times.
 8. `/task-proposal` sends the request to `tb2-task-proposer`, which follows the local profile, prints the selected proposal fields in chat, iterates until the user reports all four platform checks pass, and invokes builder/reviewer repair only after explicit approval.
 
 Before editing:

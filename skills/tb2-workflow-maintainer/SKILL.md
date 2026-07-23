@@ -18,7 +18,8 @@ Primary opencode files:
 - `.opencode/agents/tb2-task-proposer.md`: follows the local workflow profile, prints platform fields, iterates on four proposal checks, and invokes builder only after all pass and the user approves.
 - `.opencode/agents/tb2-task-builder.md`: creates layered hidden-bug task files, uses component skills, validates structural/NOP/oracle behavior, writes humanized field answers.
 - `.opencode/agents/tb2-task-reviewer.md`: statically applies the local Edition 2 review prompt and returns evidence-backed findings for builder repair.
-- `.opencode/agents/tb2-task-updater.md`: fetches submission feedback, fixes concrete task issues, uses fast structural/alignment/metadata checks for instruction.md and/or task.toml-only edits or full NOP/oracle validation for runtime-affecting edits, and updates without sending to reviewer.
+- `.opencode/agents/tb2-update-task-orchestrator.md`: lists revision submissions and delegates at most four updater agents in parallel.
+- `.opencode/agents/tb2-task-updater.md`: handles one submission by repairing and checking, sending a clean task to review, or preparing a manual rubric handoff.
 - `.opencode/agents/tb2-workflow-maintainer.md`: modifies workflow infrastructure.
 - `.opencode/skills/tb2-*/SKILL.md`: component workflow guidance.
 - `.opencode/scripts/*`: execution backend scripts for create, validate, submit, and update-only feedback handling.
@@ -36,11 +37,13 @@ Create-task backend scripts:
 - `tb2_copy_field_answers.sh`: copies a full field-answer file or a single section without interactive pauses.
 - `tb2_prepare_upload.sh`: validates that the target is a direct `tasks/<task>` folder, removes generated `__pycache__` directories, and deletes only the generated root-level `<task>.zip` archive before validation, submission, or update upload.
 - `tb2_submit_task.sh`: submission helper.
-- `tb2_update_task.sh`: update helper that prepares upload cleanup and runs `stb submissions update ... --no-send-to-reviewer` with a random 280-350 minute time.
+- `tb2_update_task.sh`: update helper that prepares upload cleanup, selects checks or reviewer mode, retries at most five times, and uses a random 280-350 minute time.
 
 Update-only feedback scripts:
 - `tb2_status_iterate.sh`: feedback/update helper.
 - `tb2_quality_report.py`: feedback summary helper.
+- `tb2_list_revisions.sh`: lists only `NEEDS_REVISION` submissions for the configured project.
+- `tb2_update_state.py`: tracks addressed revision-note hashes and pending rubric handoffs under the ignored workflow cache.
 
 ## Flow
 
@@ -49,8 +52,8 @@ Update-only feedback scripts:
 3. `tb2-task-builder` initializes and authors the layered hidden-bug task, uses component skills instead of bulk doc reads, validates, and writes humanized field answers.
 4. The parent invokes `tb2-task-reviewer`, sends all static review findings to the builder, and repeats repair and review until clean or blocked.
 5. Parent reports a compact result and asks before platform submission only after a clean review.
-6. User runs `/update-task <submission_id>`.
-7. `tb2-task-updater` fetches feedback, summarizes issues, fixes the matching local task, uses structural/alignment/metadata checks without NOP/oracle for instruction.md and/or task.toml-only changes, otherwise validates structural/NOP/oracle behavior, and runs the update helper only after the applicable validation passes; the helper chooses a random 280-350 minute update time and uses `--no-send-to-reviewer`.
+6. User runs `/update-task`.
+7. `tb2-update-task-orchestrator` lists only `NEEDS_REVISION` submissions and delegates batches of at most four parallel `tb2-task-updater` calls. Each updater classifies one submission, validates any task action, and either reruns checks, sends a clean task to reviewer, returns a manual rubric handoff, or blocks.
 8. `/task-proposal` applies the local profile, emits proposal fields in chat, revises them from platform feedback until all four checks pass, then runs builder/reviewer repair only after explicit user approval.
 
 ## Safe Modification Rules
@@ -58,7 +61,7 @@ Update-only feedback scripts:
 - Modify only workflow infrastructure unless explicitly asked otherwise.
 - Never modify `tasks/**` as part of workflow maintenance.
 - Never submit or update platform submissions from `/modify-workflow`.
-- `/update-task` is the only workflow command that may run `stb submissions update`, and it must include `--no-send-to-reviewer`.
+- `/update-task` is the only workflow command that may run `stb submissions update`. Repair uploads must include `--no-send-to-reviewer`; reviewer handoffs must omit it, and one fetched result may run only one mode.
 - Read opencode docs and schema before changing command, agent, plugin, skill, permission, or config shapes.
 - Keep edits small and targeted.
 - Prefer deterministic script helpers over agent reasoning for mechanical repository facts such as changed-file lists, instruction word/paragraph counts, metadata summaries, duplicate scans, validation scope, and structural linting.
