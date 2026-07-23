@@ -6,11 +6,11 @@ from __future__ import annotations
 import argparse
 import json
 import re
-import tomllib
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+import tomllib
 
 OPENCODE_ROOT = Path(__file__).resolve().parents[1]
 TAXONOMY_PATH = OPENCODE_ROOT / "docs" / "tb2" / "task-taxonomy.md"

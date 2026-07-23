@@ -11,7 +11,6 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-
 DIVIDER_RE = re.compile(r"^-{5,}$")
 AUTOEVAL_RE = re.compile(
     r"^AutoEval Execution Summary:\s*AutoEval execution failed\.", re.IGNORECASE

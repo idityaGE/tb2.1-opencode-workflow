@@ -3,15 +3,16 @@
 
 from __future__ import annotations
 
-import ast
 import argparse
+import ast
 import re
 import stat
 import sys
-import tomllib
 from pathlib import Path
 
+import tomllib
 from tb2_metadata import metadata_issues
+
 BLOCKED_INSTRUCTION_PATTERNS = {
     r"\b(?:fix|repair|debug|patch)(?:s|es|ed|ing)?\b": "debugging/software-engineering",
     r"\bfailing[- ]tests?\b": "debugging/software-engineering",

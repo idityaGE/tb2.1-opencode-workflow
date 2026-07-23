@@ -7,7 +7,6 @@ import re
 import sys
 from pathlib import Path
 
-
 PATTERNS = {
     "blocking_failure": re.compile(r"\b(FAIL|FAILED|ERROR|NEEDS_REVISION|REJECTED)\b", re.I),
     "oracle": re.compile(r"\boracle\b", re.I),

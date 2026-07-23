@@ -118,7 +118,7 @@ if command -v ruff >/dev/null 2>&1; then
   ruff_paths=("$SCRIPT_DIR")
   [ -d "$task_path/tests" ] && ruff_paths+=("$task_path/tests")
   [ -d "$task_path/steps" ] && ruff_paths+=("$task_path/steps")
-  ruff check "${ruff_paths[@]}"
+  ruff check --extend-select I "${ruff_paths[@]}"
 else
   printf 'ruff not installed; skipping ruff check\n'
 fi
