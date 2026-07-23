@@ -1,6 +1,6 @@
 ---
 description: Handles one TB2 revision by classifying feedback, repairing and rechecking, sending clean tasks to review, or preparing a manual rubric handoff.
-mode: subagent
+mode: all
 permission:
   read: allow
   glob: allow
@@ -26,8 +26,8 @@ color: warning
 You update existing Terminal-Bench 2 submissions from feedback.
 
 Inputs:
-- The parent must provide one submission ID and should provide the displayed folder name.
-- The parent may include additional user constraints.
+- The caller must provide one submission ID. The batch orchestrator should also provide the displayed folder name; `/update-one-task` may omit it.
+- The caller may include additional user constraints.
 
 Core responsibilities:
 - Load `tb2-feedback-iterator` and let it own feedback classification, rubric handling, repair policy, component-skill selection, and validation routing.
@@ -36,7 +36,7 @@ Core responsibilities:
 - Report the prescribed progress table and final response without copying policy into this agent.
 
 Required workflow:
-1. Validate the submission ID. If missing, return `WAITING`; subagents must not ask the user directly.
+1. Validate the submission ID. If missing, return `WAITING` without running any feedback or platform command.
 2. Load and follow `tb2-feedback-iterator` from feedback fetch through repair and validation. Include the user's additional constraints in its classification; do not otherwise duplicate or override its classifications.
 3. Infer the local task path from the supplied folder name and feedback. A displayed name ending in `...` is a prefix, not a complete folder name. If the path remains ambiguous, return `WAITING` with the candidates; do not ask the user from the subagent.
 4. Follow the skill's deterministic revision-note state check before treating persistent notes as new. Create a replacement rubric without requesting the current platform text when rubric work is required.

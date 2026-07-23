@@ -12,7 +12,8 @@ Use when modifying the TB2 task-creation workflow itself.
 Primary opencode files:
 - `.opencode/commands/create-task.md`: user-facing task creation command.
 - `.opencode/commands/task-proposal.md`: user-facing proposal research, platform-check iteration, and approval-gated creation command.
-- `.opencode/commands/update-task.md`: user-facing submission feedback/update command.
+- `.opencode/commands/update-task.md`: user-facing batch command for all revision submissions.
+- `.opencode/commands/update-one-task.md`: user-facing command for one explicit submission ID.
 - `.opencode/commands/modify-workflow.md`: user-facing workflow modification command.
 - `.opencode/agents/tb2-task-orchestrator.md`: follows the local workflow profile, researches options, asks the user, invokes builder, asks before submission.
 - `.opencode/agents/tb2-task-proposer.md`: follows the local workflow profile, prints platform fields, iterates on four proposal checks, and invokes builder only after all pass and the user approves.
@@ -54,14 +55,15 @@ Update-only feedback scripts:
 5. Parent reports a compact result and asks before platform submission only after a clean review.
 6. User runs `/update-task`.
 7. `tb2-update-task-orchestrator` lists only `NEEDS_REVISION` submissions and delegates batches of at most four parallel `tb2-task-updater` calls. Each updater classifies one submission, validates any task action, and either reruns checks, sends a clean task to reviewer, returns a manual rubric handoff, or blocks.
-8. `/task-proposal` applies the local profile, emits proposal fields in chat, revises them from platform feedback until all four checks pass, then runs builder/reviewer repair only after explicit user approval.
+8. User may instead run `/update-one-task <submission_id>` to invoke the same updater for exactly one submission without listing the batch queue.
+9. `/task-proposal` applies the local profile, emits proposal fields in chat, revises them from platform feedback until all four checks pass, then runs builder/reviewer repair only after explicit user approval.
 
 ## Safe Modification Rules
 
 - Modify only workflow infrastructure unless explicitly asked otherwise.
 - Never modify `tasks/**` as part of workflow maintenance.
 - Never submit or update platform submissions from `/modify-workflow`.
-- `/update-task` is the only workflow command that may run `stb submissions update`. Repair uploads must include `--no-send-to-reviewer`; reviewer handoffs must omit it, and one fetched result may run only one mode.
+- `/update-task` and `/update-one-task` are the only workflow commands that may run `stb submissions update`. Repair uploads must include `--no-send-to-reviewer`; reviewer handoffs must omit it, and one fetched result may run only one mode.
 - Read opencode docs and schema before changing command, agent, plugin, skill, permission, or config shapes.
 - Keep edits small and targeted.
 - Prefer deterministic script helpers over agent reasoning for mechanical repository facts such as changed-file lists, instruction word/paragraph counts, metadata summaries, duplicate scans, validation scope, and structural linting.
