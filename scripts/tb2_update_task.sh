@@ -45,7 +45,6 @@ if [[ "$prep_output" =~ removed\ __pycache__\ directories:\ [1-9][0-9]* ]] \
 fi
 
 printf '\n== Platform-aligned Ruff check ==\n'
-command -v ruff >/dev/null 2>&1 || tb2_die "ruff is required before a platform update"
 tb2_run_platform_ruff "$task_path" || tb2_die "local Ruff check failed; repair the findings, revalidate, and rerun this helper"
 
 minutes="$(tb2_random_time_minutes)"

@@ -9,10 +9,10 @@ usage() {
   cat <<'EOF'
 Usage: tb2_validate_task.sh --task TASK_DIR [--context create|revision]
 
-Runs structural lint, ruff, NOP, and oracle checks. NOP must earn reward 0 and
-oracle must earn reward 1. On success, records a small runtime-file validation
-baseline used by update-task to avoid repeated full runs after instruction.md or
-task.toml-only edits.
+Runs structural lint, mandatory isolated Ruff, NOP, and oracle checks. NOP must
+earn reward 0 and oracle must earn reward 1. On success, records a small
+runtime-file validation baseline used by update-task to avoid repeated full runs
+after instruction.md or task.toml-only edits.
 EOF
 }
 
@@ -114,12 +114,9 @@ printf '== Structural lint ==\n'
 python3 "$SCRIPT_DIR/tb2_task_lint.py" --context "$context" "$task_path"
 
 printf '\n== Ruff verifier/helper check ==\n'
-if command -v ruff >/dev/null 2>&1; then
-  ruff check --extend-select I "$SCRIPT_DIR"
-  tb2_run_platform_ruff "$task_path"
-else
-  printf 'ruff not installed; skipping ruff check\n'
-fi
+tb2_require_ruff
+ruff check --extend-select I "$SCRIPT_DIR"
+tb2_run_platform_ruff "$task_path"
 
 printf '\n== NOP agent check ==\n'
 run_harbor_eval nop
