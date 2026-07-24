@@ -72,15 +72,23 @@ evidence for those criteria; cite their rows when scoring. For milestone tasks, 
 milestone (requirements, tests, and oracle scoped to that milestone).
 
 1. **REQUIREMENTS (R1, R2, …)** — every distinct requirement stated or clearly implied by
-   instruction.md, one checkable behavior/output per line, each with a `file:line` quote.
+   instruction.md and every normative clause in each explicitly referenced agent-visible README/spec/rule
+   file, one independently falsifiable behavior/output per line, each with a `file:line` quote. Split every
+   `and`/`or` member, named enum/status/reason, observable conditional branch, boundary or mode, schema
+   exactness rule, and ordering key/tie-break; a representative case does not cover separate alternatives.
 2. **TEST → REQ** — for every assertion in `tests/` (and `test_mN.py`), the exact thing it checks and
    which requirement Rn it maps to. A test that maps to no requirement is a phantom-spec candidate
    (criterion 36). A requirement with no test is a req-gap (criterion 38). A test that a well-formatted
-   but wrong solution would still pass is a weak/vacuous candidate (criteria 37, 40, 43).
+   but wrong solution would still pass is a weak/vacuous candidate (criteria 37, 40, 43). Map raw-byte,
+   full-string, stdout/stderr, exit-code, exact-key-set, named-value, and ordering assertions separately;
+   sets or dictionaries do not prove a public sequence, and one sort-key example does not prove a full
+   documented ordering.
 3. **ORACLE → REQ** — for each requirement Rn, whether `solve.sh`/`solveN.sh` implements it by deriving
    the output (not hardcoding). A requirement with no derivation is an oracle gap (criterion 31).
 
-Score 2/31/36/37/38 strictly from this map. Do not assert coverage you did not map.
+Score 2/31/36/37/38 strictly from this map. Do not assert coverage you did not map. Finding one gap does
+not complete an alignment criterion: scan every map row and every semantically distinct assertion, then
+include all discovered gaps and phantom-spec assertions in the same review output.
 
 ---
 
@@ -189,8 +197,8 @@ has no rubric; section H when not long_context).
     instruction (no phantom-spec testing undescribed behavior).
 37. [HIGH] Verifiers check correctness, not just format/high-level shape — they confirm a real, correct
     implementation.
-38. [HIGH] Every requirement has a corresponding test (no req-gap) — each instruction requirement is
-    asserted by at least one test.
+38. [HIGH] Every requirement has a corresponding test (no req-gap) — each instruction requirement and
+    each normative clause in an explicitly referenced public contract is asserted by at least one test.
 39. [HIGH] Tests verify behavior, not implementation — they run the code and check results; they do not
     grep/parse source for patterns (e.g. asserting `"sorted("` appears).
 40. [HIGH] No vacuous tests — no test that passes regardless of output (empty loops, always-true
@@ -287,8 +295,9 @@ first enumerate exactly what the tests assert, then apply it.
   >250 words; or contains an emoji; or is a numbered/bulleted multi-step procedure chaining several
   unrelated subtasks. Else PASS.
 - **2 Well specified** — Enumerate every output/behavior the tests assert. PASS iff each is derivable
-  from instruction.md (path + the values/format the tests enforce). FAIL if the difficulty is mainly
-  from many edge cases the instruction never states.
+  from instruction.md plus any explicitly referenced public contract whose requirement category the
+  instruction introduces (path + the values/format the tests enforce). FAIL if the difficulty is mainly
+  from many edge cases the public contract never states.
 - **3 Interesting** — Name one concrete role + situation where a real developer/user would want this.
   PASS if you can name one in a sentence; FAIL if you cannot.
 - **4 No solution hints** — FAIL if instruction.md gives step-by-step how-to instructions, names the
@@ -301,16 +310,18 @@ first enumerate exactly what the tests assert, then apply it.
   requirements that belong in instruction.md (instruction.md offloads the real task to the doc to dodge
   length limits); or reads as a hyper-structured LLM prompt rather than a real engineering document.
 - **9 Formats specified** — For each file path the tests open: PASS iff instruction.md names that path
-  and every format detail the tests enforce (headers/keys/ordering/exact text). FAIL if a test enforces
-  a format detail the instruction never states.
+  and instruction.md or its explicitly referenced public contract states every format detail the tests
+  enforce (headers/keys/ordering/exact text). FAIL if a test enforces a format detail the public contract
+  never states.
 - **10 Unverifiable tools** — FAIL if instruction.md mandates a named tool/editor/construct whose use
   cannot be detected from the result (e.g. "use vim", "use a for loop"). PASS if it specifies outcomes
   only.
-- **31 Oracle reflects instruction** — PASS iff solve.sh/solveN.sh implements EVERY instruction
-  requirement by deriving outputs from inputs. FAIL if any output is hardcoded/echoed or any
-  requirement is unimplemented.
-- **36 Aligned** — PASS iff every test maps to a requirement stated or implied by instruction.md. FAIL
-  if any test enforces behavior the instruction never describes.
+- **31 Oracle reflects instruction** — PASS iff solve.sh/solveN.sh implements EVERY instruction and
+  explicitly referenced public-contract requirement by deriving outputs from inputs. FAIL if any output
+  is hardcoded/echoed or any requirement is unimplemented.
+- **36 Aligned** — PASS iff every test maps to a requirement stated or implied by instruction.md or an
+  explicitly referenced public contract whose requirement category instruction.md introduces. FAIL if
+  any test enforces behavior the public contract never describes.
 - **37 Correctness not format** — Imagine a solution that is correctly formatted but computes wrong
   values. PASS iff at least one test would fail it. FAIL if every test would still pass.
 - **46 Test complexity** — FAIL if the number of independent test methods is disproportionate to the

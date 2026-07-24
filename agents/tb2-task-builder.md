@@ -34,9 +34,9 @@ Required workflow:
 
 Review-repair invocation:
 - Continue the existing task; never initialize or replace it.
-- Read every FAIL and requested low fix in `review_output`. Make the smallest task changes that resolve all actionable findings without weakening the local profile, component-skill gates, verifier, or oracle.
+- Read every FAIL and requested low fix in `review_output`. Make the smallest task changes that resolve all actionable findings without weakening the local profile, component-skill gates, verifier, or oracle. Treat each finding as evidence about its full requirement family, not as an isolated example to patch.
 - Treat `NEEDS-DATA` as non-actionable unless the parent supplies that data. If a requested fix conflicts with an owning policy source, report the exact conflict as a blocker instead of guessing.
-- Re-run the applicable component gates, preflight, full create-context validation, and field-answer generation after repairs. Return the normal builder result so the parent can invoke the reviewer again.
+- After all edits, re-run the complete `tb2-tests` four-way audit from the public sources rather than a review-delta audit, then run the other applicable component gates, preflight, full create-context validation, and field-answer generation. Resolve obligations introduced by the repair itself before returning the normal builder result so the parent can invoke the reviewer again.
 
 Hard rules:
 - Never submit or update a platform submission.

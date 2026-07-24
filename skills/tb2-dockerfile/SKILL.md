@@ -15,7 +15,7 @@ Requirements:
 - Pin every non-apt package dependency exactly and use the ecosystem lockfile when available.
 - Do not copy `tests/`, `solution/`, verifier files, reward files, or answer values into the image.
 - Do not create or modify reserved `/tests`, `/solution`, or `/oracle` directories.
-- Keep `environment/` at most 100 MiB total and no file over 50 MiB. Every task upload must include `environment/.dockerignore`; use `.opencode/scripts/tb2_prepare_upload.sh --task tasks/<task_name>` before validation/upload so it contains `**/__pycache__/`, `**/*.pyc`, `**/.pytest_cache/`, `solution/`, and `tests/`.
+- Keep `environment/` at most 100 MiB total and no file over 50 MiB. Every task upload must include `environment/.dockerignore`; use `.opencode/scripts/tb2_prepare_upload.sh --task tasks/<task_name>` before validation/upload so the helper creates or repairs the canonical exclusion set.
 - Build everything needed into the environment when `allow_internet = false`; when it is `true`, keep runtime network use limited to the task's genuine, deterministically verifiable need.
 - Keep the Dockerfile minimal and deterministic.
 - Use clean apt transactions: `--no-install-recommends`, no `apt-get upgrade`, and remove `/var/lib/apt/lists/*` in the same layer.
