@@ -9,7 +9,14 @@ permission:
     "tb2-task-updater": allow
   bash:
     "*": deny
-    ".opencode/scripts/tb2_list_revisions.sh": allow
+    ".opencode/scripts/tb2_list_revisions.sh*": allow
+    ".opencode/scripts/tb2_resolve_submission_task.sh*": allow
+    ".opencode/scripts/tb2_status_iterate.sh*": allow
+    ".opencode/scripts/tb2_task_state.sh*": allow
+    ".opencode/scripts/tb2_preflight_task.sh*": allow
+    ".opencode/scripts/tb2_validate_task.sh*": allow
+    ".opencode/scripts/tb2_update_task.sh*": allow
+    "python3 .opencode/scripts/tb2_update_state.py*": allow
   edit: deny
 color: warning
 ---
