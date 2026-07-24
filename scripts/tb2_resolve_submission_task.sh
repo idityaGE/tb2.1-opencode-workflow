@@ -93,11 +93,10 @@ if [ "${#matches[@]}" -eq 0 ] && [ -n "$folder_name" ]; then
 fi
 
 if [ "${#matches[@]}" -gt 1 ]; then
-  printf 'error: submission matches multiple local tasks:\n' >&2
+  printf 'warning: submission matches multiple local tasks; downloading submitted artifact to disambiguate:\n' >&2
   for candidate in "${matches[@]}"; do
     printf 'candidate=%s\n' "${candidate#"$repo_root/"}" >&2
   done
-  exit 3
 fi
 
 if [ "${#matches[@]}" -eq 1 ]; then
@@ -155,7 +154,13 @@ fi
 
 downloaded_name="$(basename -- "${downloaded_tasks[0]}")"
 target="$tasks_dir/$downloaded_name"
-[ ! -e "$target" ] || tb2_die "download target already exists: ${target#"$repo_root/"}"
+if [ -e "$target" ]; then
+  [ -d "$target" ] || tb2_die "download target exists but is not a directory: ${target#"$repo_root/"}"
+  [ -f "$target/task.toml" ] || tb2_die "download target exists but is not a task folder: ${target#"$repo_root/"}"
+  printf 'task_path=%s\n' "${target#"$repo_root/"}"
+  printf 'task_source=local-from-download-name\n'
+  exit 0
+fi
 
 mv "${downloaded_tasks[0]}" "$target"
 printf 'task_path=%s\n' "${target#"$repo_root/"}"
