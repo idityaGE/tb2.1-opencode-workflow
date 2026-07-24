@@ -9,7 +9,8 @@ usage() {
   cat <<'EOF'
 Usage: tb2_preflight_task.sh --task TASK_DIR [--context create|revision]
 
-Runs fast local checks only: structural lint and mandatory isolated Ruff.
+Runs fast local checks only: structural lint, mandatory isolated Ruff, and
+non-blocking advisory Ruff family guidance.
 Does not run NOP or oracle.
 EOF
 }
@@ -43,5 +44,6 @@ printf '\n== Fast ruff check ==\n'
 tb2_require_ruff
 ruff check --extend-select I "$SCRIPT_DIR"
 tb2_run_platform_ruff "$task_path"
+tb2_run_advisory_ruff "$task_path"
 
 printf '\nPreflight completed for %s\n' "$task_path"

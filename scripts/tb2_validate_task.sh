@@ -9,10 +9,11 @@ usage() {
   cat <<'EOF'
 Usage: tb2_validate_task.sh --task TASK_DIR [--context create|revision]
 
-Runs structural lint, mandatory isolated Ruff, NOP, and oracle checks. NOP must
-earn reward 0 and oracle must earn reward 1. On success, records a small
-runtime-file validation baseline used by update-task to avoid repeated full runs
-after instruction.md or task.toml-only edits.
+Runs structural lint, mandatory isolated Ruff, non-blocking advisory Ruff family
+guidance, NOP, and oracle checks. NOP must earn reward 0 and oracle must earn
+reward 1. On success, records a small runtime-file validation baseline used by
+update-task to avoid repeated full runs after instruction.md or task.toml-only
+edits.
 EOF
 }
 
@@ -117,6 +118,7 @@ printf '\n== Ruff verifier/helper check ==\n'
 tb2_require_ruff
 ruff check --extend-select I "$SCRIPT_DIR"
 tb2_run_platform_ruff "$task_path"
+tb2_run_advisory_ruff "$task_path"
 
 printf '\n== NOP agent check ==\n'
 run_harbor_eval nop
