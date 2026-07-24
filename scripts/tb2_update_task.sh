@@ -36,6 +36,31 @@ done
 task_path="$(tb2_abs_path "$task")"
 [ -d "$task_path" ] || tb2_die "task directory not found: $task_path"
 
+snorkel_config="$task_path/.snorkel_config"
+current_config_submission=""
+if [ -f "$snorkel_config" ]; then
+  while IFS=: read -r key value; do
+    key="${key#"${key%%[![:space:]]*}"}"
+    key="${key%"${key##*[![:space:]]}"}"
+    value="${value:-}"
+    value="${value#"${value%%[![:space:]]*}"}"
+    value="${value%"${value##*[![:space:]]}"}"
+    if [ "$key" = "submission_id" ]; then
+      current_config_submission="$value"
+      break
+    fi
+  done < "$snorkel_config"
+fi
+
+if [ "$current_config_submission" != "$submission_id" ]; then
+  printf 'submission_id: %s\n' "$submission_id" > "$snorkel_config"
+  if [ -n "$current_config_submission" ]; then
+    printf 'updated .snorkel_config submission_id: %s -> %s\n' "$current_config_submission" "$submission_id"
+  else
+    printf 'wrote .snorkel_config submission_id: %s\n' "$submission_id"
+  fi
+fi
+
 prep_output="$("$SCRIPT_DIR/tb2_prepare_upload.sh" --task "$task_path")"
 printf '%s\n' "$prep_output"
 

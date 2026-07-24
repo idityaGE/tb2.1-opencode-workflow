@@ -224,15 +224,41 @@ async function refreshWorkerProgress(client, repoRoot, worker) {
     const messages = expectData(response, `messages for ${worker.session.id}`)
     const assistant = [...messages].reverse().find((message) => message.info.role === "assistant")
     if (!assistant) {
-      return
+      return false
     }
     const text = textFromParts(assistant.parts)
     const progress = deriveProgressFromText(text, worker.status, worker.lastEvent)
     worker.status = progress.status
     worker.lastEvent = progress.lastEvent
+    return /##\s+Update Result:\s*(SUCCESS|BLOCKED|WAITING|MANUAL ACTION)/i.test(text)
   } catch (error) {
     worker.lastEvent = compactEvent(`progress read failed: ${error instanceof Error ? error.message : String(error)}`)
+    return false
   }
+}
+
+function folderKeyFor(row) {
+  return String(row.folderName || "").trim()
+}
+
+function activeFolderKeys(active) {
+  return new Set(
+    [...active.values()]
+      .map((worker) => folderKeyFor(worker.row))
+      .filter(Boolean),
+  )
+}
+
+function nextLaunchableIndex(pending, active) {
+  if (pending.length === 0) {
+    return -1
+  }
+  const blockedFolders = activeFolderKeys(active)
+  const index = pending.findIndex((row) => {
+    const key = folderKeyFor(row)
+    return !key || !blockedFolders.has(key)
+  })
+  return index >= 0 ? index : active.size === 0 ? 0 : -1
 }
 
 function parseUpdateResult(row, sessionId, text, errorNote = "") {
@@ -506,7 +532,12 @@ async function runBatch(options) {
 
     while (pending.length > 0 || active.size > 0) {
       while (!shutdownRequested && pending.length > 0 && active.size < options.maxWorkers) {
-        const row = pending.shift()
+        const launchIndex = nextLaunchableIndex(pending, active)
+        if (launchIndex < 0) {
+          await writeBatchEvent(eventsPath, "waiting-for-folder-slot active folders already cover all pending nonblank folders")
+          break
+        }
+        const row = pending.splice(launchIndex, 1)[0]
         const slot = freeSlots.shift()
         const worker = await launchWorker(opencode.client, options.repoRoot, row, options.constraints, slot)
         active.set(worker.session.id, worker)
@@ -549,23 +580,32 @@ async function runBatch(options) {
         }
 
         const status = statuses[sessionId]
+        let collectReason = ""
         if (status?.type === "idle") {
           worker.status = "collecting result"
           worker.lastEvent = "session idle"
-          const result = await collectWorker(opencode.client, options.repoRoot, batchDir, worker)
-          results.push(result)
-          active.delete(sessionId)
-          freeSlots.push(worker.slot)
-          freeSlots.sort((left, right) => left - right)
-          await writeBatchEvent(eventsPath, `finished submission=${worker.row.submissionId} session=${sessionId} result=${result.result} active=${active.size} pending=${pending.length}`)
-          await reporter.update(renderProgress(progressContext))
+          collectReason = "idle"
         } else if (status?.type === "retry") {
           worker.status = "model retry"
           worker.lastEvent = `attempt ${status.attempt}: ${status.message}`
           await writeBatchEvent(eventsPath, `retry submission=${worker.row.submissionId} session=${sessionId} attempt=${status.attempt} message=${compactEvent(status.message)}`)
         } else {
           worker.status = status?.type === "busy" ? worker.status === "launched" ? "running" : worker.status : "waiting for status"
-          await refreshWorkerProgress(opencode.client, options.repoRoot, worker)
+          const hasFinalResponse = await refreshWorkerProgress(opencode.client, options.repoRoot, worker)
+          if (hasFinalResponse) {
+            worker.status = "collecting result"
+            collectReason = status ? "final-response-visible" : "final-response-visible-without-active-status"
+          }
+        }
+
+        if (collectReason) {
+          const result = await collectWorker(opencode.client, options.repoRoot, batchDir, worker)
+          results.push(result)
+          active.delete(sessionId)
+          freeSlots.push(worker.slot)
+          freeSlots.sort((left, right) => left - right)
+          await writeBatchEvent(eventsPath, `finished submission=${worker.row.submissionId} session=${sessionId} result=${result.result} reason=${collectReason} active=${active.size} pending=${pending.length}`)
+          await reporter.update(renderProgress(progressContext))
         }
       }
       await reporter.update(renderProgress(progressContext))
