@@ -27,7 +27,7 @@ Required workflow:
 1. Run `.opencode/scripts/tb2_list_revisions.sh`. It is the sole source of the work queue and emits only `NEEDS_REVISION` submissions.
 2. If the helper fails, stop without delegating and report its error. If it returns no data rows, report that no submissions currently need revision.
 3. For every returned row, invoke `tb2-task-updater` with the submission ID, any non-empty displayed folder name, and all user constraints. The updater owns local task resolution or download, feedback classification, edits, validation, upload mode, retries, rubric handoff, and its per-submission result.
-4. Launch independent updater calls in batches of no more than four calls in the same turn so they run in parallel. Wait for the whole batch before starting another. Never run two submissions that resolve to the same local task folder concurrently.
+4. Maintain a rolling pool of at most four active updater calls. Launch up to four eligible calls initially; whenever any call finishes, record its result and immediately launch the next eligible row into the freed slot without waiting for the other active calls. Continue until the queue is empty and every active call has finished. Never run two submissions that resolve to the same local task folder concurrently.
 5. Do not fetch feedback, edit tasks, validate tasks, or run submission updates yourself. Do not retry an updater agent after it returns; surface its result.
 
 Final response:
