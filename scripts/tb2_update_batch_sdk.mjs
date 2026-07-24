@@ -108,7 +108,7 @@ Submission ID: ${row.submissionId}
 Displayed folder name: ${folder}
 Additional user constraints: ${userConstraints}
 
-Follow the tb2-task-updater agent instructions as the workflow source of truth. Do not ask the user from this child session. Resolve/download the local task, fetch feedback, choose exactly one owned action, run applicable validation before any update mode, and return the required final response shape.`
+Follow the tb2-task-updater agent instructions as the workflow source of truth. Do not ask the user from this child session, do not call the question tool, and do not wait for clarification; return WAITING, MANUAL ACTION, or BLOCKED when user input would be required. Resolve/download the local task, fetch feedback, choose exactly one owned action, run applicable validation before any update mode, and return the required final response shape.`
 }
 
 function sleep(ms) {
@@ -149,6 +149,90 @@ function tableEscape(value) {
     .replaceAll("\n", " ")
     .trim()
   return text || "-"
+}
+
+function shortSubmission(value) {
+  return String(value || "").slice(0, 8) || "-"
+}
+
+function displayFolder(value) {
+  const text = String(value || "").trim()
+  if (!text) {
+    return "<blank>"
+  }
+  return text.length > 24 ? `${text.slice(0, 21)}...` : text
+}
+
+function formatElapsed(ms) {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000))
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`
+  }
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`
+}
+
+function compactEvent(value) {
+  const text = String(value || "")
+    .replaceAll("|", "\\|")
+    .replaceAll("`", "")
+    .replace(/\s+/g, " ")
+    .trim()
+  if (!text) {
+    return "-"
+  }
+  return text.length > 96 ? `${text.slice(0, 93)}...` : text
+}
+
+function deriveProgressFromText(text, fallbackStatus, fallbackEvent) {
+  const lines = String(text || "")
+    .split(/\r?\n/)
+    .map((line) => line.replace(/^[-*#>\s]+/, "").trim())
+    .filter(Boolean)
+  const joined = lines.join("\n").toLowerCase()
+  const lastLine = lines.at(-1) || fallbackEvent
+
+  let status = fallbackStatus
+  if (/update result:\s*(success|blocked|waiting|manual action)/i.test(text)) {
+    status = "finishing"
+  } else if (joined.includes("tb2_update_task.sh") || joined.includes("stb submissions update")) {
+    status = "updating platform"
+  } else if (joined.includes("oracle")) {
+    status = "oracle running"
+  } else if (joined.includes("nop")) {
+    status = "nop running"
+  } else if (joined.includes("tb2_validate_task.sh") || joined.includes("full validation") || joined.includes("validating full")) {
+    status = "validating full"
+  } else if (joined.includes("tb2_preflight_task.sh") || joined.includes("fast-only") || joined.includes("preflight")) {
+    status = "validating fast"
+  } else if (joined.includes("planned fix") || joined.includes("likely files")) {
+    status = "planning repairs"
+  } else if (joined.includes("tb2_status_iterate.sh") || joined.includes("fetching feedback") || joined.includes("feedback")) {
+    status = "fetching feedback"
+  } else if (joined.includes("tb2_resolve_submission_task.sh") || joined.includes("resolve") || joined.includes("download")) {
+    status = "resolving task"
+  }
+
+  return { status, lastEvent: compactEvent(lastLine) }
+}
+
+async function refreshWorkerProgress(client, repoRoot, worker) {
+  try {
+    const response = await client.session.messages({ path: { id: worker.session.id }, query: { directory: repoRoot } })
+    const messages = expectData(response, `messages for ${worker.session.id}`)
+    const assistant = [...messages].reverse().find((message) => message.info.role === "assistant")
+    if (!assistant) {
+      return
+    }
+    const text = textFromParts(assistant.parts)
+    const progress = deriveProgressFromText(text, worker.status, worker.lastEvent)
+    worker.status = progress.status
+    worker.lastEvent = progress.lastEvent
+  } catch (error) {
+    worker.lastEvent = compactEvent(`progress read failed: ${error instanceof Error ? error.message : String(error)}`)
+  }
 }
 
 function parseUpdateResult(row, sessionId, text, errorNote = "") {
@@ -217,6 +301,58 @@ function renderFinalTable(results) {
   return lines.join("\n")
 }
 
+function renderConnectionHelp(serverUrl, batchDir) {
+  return [
+    "## TB2 Update Batch Monitor",
+    "",
+    `- SDK server: ${serverUrl}`,
+    `- Attach TUI to running sessions: \`opencode attach ${serverUrl}\``,
+    "- Web command: `opencode web --port 0 --hostname 127.0.0.1` starts a separate web server; use `opencode attach` for these scheduler sessions.",
+    `- Session logs: \`${batchDir}\``,
+    "- Child updater sessions are instructed not to ask questions; user-input cases should return WAITING, MANUAL ACTION, or BLOCKED.",
+  ].join("\n")
+}
+
+function renderProgress({ active, batchDir, maxWorkers, pending, results, serverUrl, total }) {
+  const counts = countSummary(results)
+  const lines = [
+    "",
+    "---",
+    "",
+    "## TB2 Update Batch",
+    "",
+    `Active: ${active.size}/${maxWorkers}   Done: ${results.length}/${total}   Pending: ${pending.length}   Updated: ${counts.checks}   Reviewer: ${counts.reviewer}   Manual: ${counts.manual}   Blocked: ${counts.blocked}   Waiting: ${counts.waiting}`,
+    "",
+    `Attach: \`opencode attach ${serverUrl}\``,
+    `Logs: \`${batchDir}\``,
+    "",
+    "| Slot | Submission | Folder | Session ID | Status | Elapsed | Last event |",
+    "|---:|---|---|---|---|---:|---|",
+  ]
+
+  const workers = [...active.values()].sort((left, right) => left.slot - right.slot)
+  if (workers.length === 0) {
+    lines.push("| - | - | - | - | idle | 00:00 | waiting for next launch |")
+  } else {
+    for (const worker of workers) {
+      lines.push(
+        `| ${worker.slot} | ${tableEscape(shortSubmission(worker.row.submissionId))} | ${tableEscape(displayFolder(worker.row.folderName))} | ${tableEscape(worker.session.id)} | ${tableEscape(worker.status)} | ${formatElapsed(Date.now() - worker.startedAt)} | ${compactEvent(worker.lastEvent)} |`,
+      )
+    }
+  }
+
+  if (results.length > 0) {
+    lines.push("", "Recent completions:", "", "| Submission | Folder | Session ID | Result | Platform action | Attempts | Notes |", "|---|---|---|---|---|---:|---|")
+    for (const item of results.slice(-8)) {
+      lines.push(
+        `| ${tableEscape(shortSubmission(item.submission))} | ${tableEscape(displayFolder(item.folder))} | ${tableEscape(item.sessionId)} | ${tableEscape(item.result)} | ${tableEscape(item.platformAction)} | ${item.attempts} | ${tableEscape(item.notes)} |`,
+      )
+    }
+  }
+
+  return lines.join("\n")
+}
+
 async function writeSessionLog(batchDir, worker, messages, finalText) {
   const base = path.join(batchDir, `${worker.row.submissionId}-${worker.session.id}`)
   await writeFile(`${base}.txt`, finalText || "", "utf8")
@@ -241,7 +377,7 @@ async function collectWorker(client, repoRoot, batchDir, worker, errorNote = "")
   return parseUpdateResult(worker.row, worker.session.id, finalText, errorNote)
 }
 
-async function launchWorker(client, repoRoot, row, constraints) {
+async function launchWorker(client, repoRoot, row, constraints, slot) {
   const titleFolder = row.folderName.trim() || "blank-folder"
   const title = `TB2 update ${row.submissionId.slice(0, 8)} ${titleFolder}`
   const sessionResponse = await client.session.create({ body: { title }, query: { directory: repoRoot } })
@@ -257,7 +393,7 @@ async function launchWorker(client, repoRoot, row, constraints) {
   if (promptResponse.error) {
     throw new Error(`prompt async failed for ${row.submissionId}: ${JSON.stringify(promptResponse.error)}`)
   }
-  return { row, session, startedAt: Date.now() }
+  return { lastEvent: "prompt sent", row, session, slot, startedAt: Date.now(), status: "launched" }
 }
 
 async function runBatch(options) {
@@ -284,6 +420,9 @@ async function runBatch(options) {
   console.log(`Starting opencode SDK server on 127.0.0.1:${port}`)
   const opencode = await createOpencode({ hostname: "127.0.0.1", port, timeout: 15000 })
   try {
+    const serverUrl = opencode.server.url || `http://127.0.0.1:${port}`
+    console.log(renderConnectionHelp(serverUrl, batchDir))
+
     const agentsResponse = await opencode.client.app.agents()
     const agents = expectData(agentsResponse, "agent list")
     if (!agents.some((agent) => agent.name === "tb2-task-updater")) {
@@ -292,15 +431,19 @@ async function runBatch(options) {
 
     const pending = [...rows]
     const active = new Map()
+    const freeSlots = Array.from({ length: options.maxWorkers }, (_, index) => index + 1)
     const results = []
     const timeoutMs = options.sessionTimeoutMinutes * 60 * 1000
+    const progressContext = { active, batchDir, maxWorkers: options.maxWorkers, pending, results, serverUrl, total: rows.length }
+    console.log(renderProgress(progressContext))
 
     while (pending.length > 0 || active.size > 0) {
       while (pending.length > 0 && active.size < options.maxWorkers) {
         const row = pending.shift()
-        const worker = await launchWorker(opencode.client, options.repoRoot, row, options.constraints)
+        const slot = freeSlots.shift()
+        const worker = await launchWorker(opencode.client, options.repoRoot, row, options.constraints, slot)
         active.set(worker.session.id, worker)
-        console.log(`launched ${row.submissionId} session=${worker.session.id} active=${active.size} pending=${pending.length}`)
+        console.log(renderProgress(progressContext))
       }
 
       if (active.size === 0) {
@@ -314,6 +457,8 @@ async function runBatch(options) {
       for (const [sessionId, worker] of [...active.entries()]) {
         const elapsed = Date.now() - worker.startedAt
         if (elapsed > timeoutMs) {
+          worker.status = "timed out"
+          worker.lastEvent = `aborting after ${options.sessionTimeoutMinutes} minutes`
           await opencode.client.session.abort({ path: { id: sessionId }, query: { directory: options.repoRoot } })
           const result = await collectWorker(
             opencode.client,
@@ -324,20 +469,31 @@ async function runBatch(options) {
           )
           results.push(result)
           active.delete(sessionId)
-          console.log(`timed out ${worker.row.submissionId} session=${sessionId} active=${active.size} pending=${pending.length}`)
+          freeSlots.push(worker.slot)
+          freeSlots.sort((left, right) => left - right)
+          console.log(renderProgress(progressContext))
           continue
         }
 
         const status = statuses[sessionId]
         if (status?.type === "idle") {
+          worker.status = "collecting result"
+          worker.lastEvent = "session idle"
           const result = await collectWorker(opencode.client, options.repoRoot, batchDir, worker)
           results.push(result)
           active.delete(sessionId)
-          console.log(`finished ${worker.row.submissionId} result=${result.result} active=${active.size} pending=${pending.length}`)
+          freeSlots.push(worker.slot)
+          freeSlots.sort((left, right) => left - right)
+          console.log(renderProgress(progressContext))
         } else if (status?.type === "retry") {
-          console.log(`retrying ${worker.row.submissionId} attempt=${status.attempt} message=${status.message}`)
+          worker.status = "model retry"
+          worker.lastEvent = `attempt ${status.attempt}: ${status.message}`
+        } else {
+          worker.status = status?.type === "busy" ? worker.status === "launched" ? "running" : worker.status : "waiting for status"
+          await refreshWorkerProgress(opencode.client, options.repoRoot, worker)
         }
       }
+      console.log(renderProgress(progressContext))
     }
 
     console.log(`Session logs: ${batchDir}`)
