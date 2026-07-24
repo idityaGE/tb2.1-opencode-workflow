@@ -16,8 +16,8 @@ tb2_run_platform_ruff() {
 tb2_run_advisory_ruff() {
   local task_path="$1"
   tb2_require_ruff
-  printf 'Advisory Ruff families (non-blocking): I,UP,PLW,ISC,E,Q,C\n'
-  if ! ruff check --isolated --preview --select I,UP,PLW,ISC,E,Q,C "$task_path"; then
+  printf 'Advisory Ruff command (non-blocking): ruff check --select I,UP,PLW,ISC,E,Q,C,RUF100\n'
+  if ! ruff check --select I,UP,PLW,ISC,E,Q,C,RUF100 "$task_path"; then
     printf 'Advisory Ruff family findings reported; validation continues. Do not rewrite task semantics, NOP behavior, or oracle behavior just to satisfy advisory style findings.\n'
   fi
 }
