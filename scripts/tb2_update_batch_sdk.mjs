@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { spawnSync } from "node:child_process"
-import { mkdir, writeFile } from "node:fs/promises"
+import { appendFile, mkdir, writeFile } from "node:fs/promises"
 import net from "node:net"
 import path from "node:path"
 import { createOpencode } from "@opencode-ai/sdk"
@@ -301,16 +301,69 @@ function renderFinalTable(results) {
   return lines.join("\n")
 }
 
-function renderConnectionHelp(serverUrl, batchDir) {
+function renderConnectionHelp(serverUrl, batchDir, progressPath) {
   return [
     "## TB2 Update Batch Monitor",
     "",
     `- SDK server: ${serverUrl}`,
     `- Attach TUI to running sessions: \`opencode attach ${serverUrl}\``,
     "- Web command: `opencode web --port 0 --hostname 127.0.0.1` starts a separate web server; use `opencode attach` for these scheduler sessions.",
+    `- Live progress file: \`${progressPath}\``,
     `- Session logs: \`${batchDir}\``,
+    "- Terminal mode redraws the dashboard in place; captured/non-TTY mode writes live progress to the file and keeps stdout compact.",
     "- Child updater sessions are instructed not to ask questions; user-input cases should return WAITING, MANUAL ACTION, or BLOCKED.",
   ].join("\n")
+}
+
+function createSchedulerResult(row, result, notes, sessionId = "-") {
+  return {
+    attempts: 0,
+    folder: row.folderName || "-",
+    notes,
+    platformAction: "none",
+    result,
+    sessionId,
+    submission: row.submissionId,
+    text: "",
+  }
+}
+
+function countLines(text) {
+  return String(text || "").split("\n").length
+}
+
+function createProgressReporter(progressPath) {
+  const interactive = Boolean(process.stdout.isTTY)
+  let previousLineCount = 0
+  let closed = false
+
+  if (interactive) {
+    process.stdout.write("\x1b[?25l")
+  }
+
+  return {
+    async update(markdown) {
+      await writeFile(progressPath, `${markdown}\n`, "utf8")
+      if (!interactive) {
+        return
+      }
+      if (previousLineCount > 0) {
+        process.stdout.write(`\x1b[${previousLineCount}F\x1b[J`)
+      }
+      process.stdout.write(`${markdown}\n`)
+      previousLineCount = countLines(markdown) + 1
+    },
+    close() {
+      if (interactive && !closed) {
+        process.stdout.write("\x1b[?25h")
+      }
+      closed = true
+    },
+  }
+}
+
+async function writeBatchEvent(eventsPath, message) {
+  await appendFile(eventsPath, `${new Date().toISOString()}\t${message}\n`, "utf8")
 }
 
 function renderProgress({ active, batchDir, maxWorkers, pending, results, serverUrl, total }) {
@@ -415,13 +468,27 @@ async function runBatch(options) {
   const batchId = new Date().toISOString().replace(/[:.]/g, "-")
   const batchDir = path.join(options.repoRoot, ".opencode/cache/tb2-update-batches", batchId)
   await mkdir(batchDir, { recursive: true })
+  const progressPath = path.join(batchDir, "progress.md")
+  const eventsPath = path.join(batchDir, "events.log")
+  await writeFile(eventsPath, "", "utf8")
+
+  let shutdownRequested = false
+  let shutdownSignal = ""
+  const requestShutdown = (signal) => {
+    shutdownRequested = true
+    shutdownSignal = signal
+  }
+  process.once("SIGINT", () => requestShutdown("SIGINT"))
+  process.once("SIGTERM", () => requestShutdown("SIGTERM"))
 
   const port = await freePort()
   console.log(`Starting opencode SDK server on 127.0.0.1:${port}`)
   const opencode = await createOpencode({ hostname: "127.0.0.1", port, timeout: 15000 })
+  const reporter = createProgressReporter(progressPath)
   try {
     const serverUrl = opencode.server.url || `http://127.0.0.1:${port}`
-    console.log(renderConnectionHelp(serverUrl, batchDir))
+    console.log(renderConnectionHelp(serverUrl, batchDir, progressPath))
+    await writeBatchEvent(eventsPath, `server=${serverUrl}`)
 
     const agentsResponse = await opencode.client.app.agents()
     const agents = expectData(agentsResponse, "agent list")
@@ -435,15 +502,20 @@ async function runBatch(options) {
     const results = []
     const timeoutMs = options.sessionTimeoutMinutes * 60 * 1000
     const progressContext = { active, batchDir, maxWorkers: options.maxWorkers, pending, results, serverUrl, total: rows.length }
-    console.log(renderProgress(progressContext))
+    await reporter.update(renderProgress(progressContext))
 
     while (pending.length > 0 || active.size > 0) {
-      while (pending.length > 0 && active.size < options.maxWorkers) {
+      while (!shutdownRequested && pending.length > 0 && active.size < options.maxWorkers) {
         const row = pending.shift()
         const slot = freeSlots.shift()
         const worker = await launchWorker(opencode.client, options.repoRoot, row, options.constraints, slot)
         active.set(worker.session.id, worker)
-        console.log(renderProgress(progressContext))
+        await writeBatchEvent(eventsPath, `launched submission=${row.submissionId} session=${worker.session.id} slot=${slot} active=${active.size} pending=${pending.length}`)
+        await reporter.update(renderProgress(progressContext))
+      }
+
+      if (shutdownRequested) {
+        break
       }
 
       if (active.size === 0) {
@@ -471,7 +543,8 @@ async function runBatch(options) {
           active.delete(sessionId)
           freeSlots.push(worker.slot)
           freeSlots.sort((left, right) => left - right)
-          console.log(renderProgress(progressContext))
+          await writeBatchEvent(eventsPath, `timed-out submission=${worker.row.submissionId} session=${sessionId} active=${active.size} pending=${pending.length}`)
+          await reporter.update(renderProgress(progressContext))
           continue
         }
 
@@ -484,22 +557,59 @@ async function runBatch(options) {
           active.delete(sessionId)
           freeSlots.push(worker.slot)
           freeSlots.sort((left, right) => left - right)
-          console.log(renderProgress(progressContext))
+          await writeBatchEvent(eventsPath, `finished submission=${worker.row.submissionId} session=${sessionId} result=${result.result} active=${active.size} pending=${pending.length}`)
+          await reporter.update(renderProgress(progressContext))
         } else if (status?.type === "retry") {
           worker.status = "model retry"
           worker.lastEvent = `attempt ${status.attempt}: ${status.message}`
+          await writeBatchEvent(eventsPath, `retry submission=${worker.row.submissionId} session=${sessionId} attempt=${status.attempt} message=${compactEvent(status.message)}`)
         } else {
           worker.status = status?.type === "busy" ? worker.status === "launched" ? "running" : worker.status : "waiting for status"
           await refreshWorkerProgress(opencode.client, options.repoRoot, worker)
         }
       }
-      console.log(renderProgress(progressContext))
+      await reporter.update(renderProgress(progressContext))
     }
 
+    if (shutdownRequested) {
+      await writeBatchEvent(eventsPath, `shutdown-requested signal=${shutdownSignal}`)
+      for (const [sessionId, worker] of [...active.entries()]) {
+        worker.status = "aborting"
+        worker.lastEvent = `scheduler received ${shutdownSignal}`
+        await reporter.update(renderProgress(progressContext))
+        try {
+          await opencode.client.session.abort({ path: { id: sessionId }, query: { directory: options.repoRoot } })
+        } catch (error) {
+          await writeBatchEvent(eventsPath, `abort-failed submission=${worker.row.submissionId} session=${sessionId} error=${error instanceof Error ? error.message : String(error)}`)
+        }
+        const result = await collectWorker(
+          opencode.client,
+          options.repoRoot,
+          batchDir,
+          worker,
+          `Scheduler received ${shutdownSignal}; updater session was aborted before completion.`,
+        )
+        results.push(result)
+        active.delete(sessionId)
+        await writeBatchEvent(eventsPath, `aborted submission=${worker.row.submissionId} session=${sessionId}`)
+      }
+
+      while (pending.length > 0) {
+        const row = pending.shift()
+        results.push(createSchedulerResult(row, "BLOCKED", `Scheduler received ${shutdownSignal}; submission was not launched.`))
+      }
+      process.exitCode = shutdownSignal === "SIGINT" ? 130 : 143
+      await reporter.update(renderProgress(progressContext))
+    }
+
+    reporter.close()
     console.log(`Session logs: ${batchDir}`)
+    console.log(`Live progress: ${progressPath}`)
+    console.log(`Event log: ${eventsPath}`)
     console.log("")
     console.log(renderFinalTable(results))
   } finally {
+    reporter.close()
     opencode.server.close()
   }
 }
