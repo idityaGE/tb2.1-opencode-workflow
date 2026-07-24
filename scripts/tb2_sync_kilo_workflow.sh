@@ -55,6 +55,7 @@ trap cleanup EXIT
 cp -a "$source_dir" "$staging"
 rm -rf "$staging/.git"
 rm -f "$staging/scripts/tb2_sync_kilo_workflow.sh"
+rm -rf "$staging/node_modules/@opencode-ai"
 
 python3 - "$staging" "$source_dir" <<'PY'
 from __future__ import annotations
