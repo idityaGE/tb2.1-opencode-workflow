@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { spawnSync } from "node:child_process"
-import { appendFile, mkdir, writeFile } from "node:fs/promises"
+import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises"
 import net from "node:net"
 import path from "node:path"
 import { createOpencode } from "@opencode-ai/sdk"
@@ -10,11 +10,14 @@ const DEFAULT_POLL_SECONDS = 15
 const DEFAULT_SESSION_TIMEOUT_MINUTES = 360
 
 function usage() {
-  return `Usage: tb2_update_batch_sdk.mjs --repo-root PATH [--constraints TEXT] [--max-workers N] [--poll-seconds N] [--session-timeout-minutes N] [--dry-run]
+  return `Usage: tb2_update_batch_sdk.mjs --repo-root PATH [--constraints TEXT] [--max-workers N] [--poll-seconds N] [--session-timeout-minutes N] [--dry-run] [--reuse-batch BATCH_ID_OR_DIR] [--retry-blocked] [--reuse-session SUBMISSION_ID=SESSION_ID]
 
 Runs the NEEDS_REVISION queue through independent opencode SDK sessions using
 tb2-task-updater, keeping up to N active sessions and launching the next
-submission as soon as one session becomes idle.`
+submission as soon as one session becomes idle.
+
+When --reuse-batch or --reuse-session is supplied, resumes the referenced
+batch-local updater sessions instead of creating fresh sessions.`
 }
 
 function parseArgs(argv) {
@@ -24,6 +27,9 @@ function parseArgs(argv) {
     maxWorkers: DEFAULT_MAX_WORKERS,
     pollSeconds: DEFAULT_POLL_SECONDS,
     repoRoot: "",
+    retryBlocked: false,
+    reuseBatch: "",
+    reuseSessions: [],
     sessionTimeoutMinutes: DEFAULT_SESSION_TIMEOUT_MINUTES,
   }
 
@@ -39,6 +45,12 @@ function parseArgs(argv) {
       options.pollSeconds = Number.parseInt(argv[++index] ?? "", 10)
     } else if (arg === "--repo-root") {
       options.repoRoot = argv[++index] ?? ""
+    } else if (arg === "--retry-blocked") {
+      options.retryBlocked = true
+    } else if (arg === "--reuse-batch") {
+      options.reuseBatch = argv[++index] ?? ""
+    } else if (arg === "--reuse-session") {
+      options.reuseSessions.push(argv[++index] ?? "")
     } else if (arg === "--session-timeout-minutes") {
       options.sessionTimeoutMinutes = Number.parseInt(argv[++index] ?? "", 10)
     } else if (arg === "-h" || arg === "--help") {
@@ -60,6 +72,11 @@ function parseArgs(argv) {
   }
   if (!Number.isInteger(options.sessionTimeoutMinutes) || options.sessionTimeoutMinutes < 1) {
     throw new Error("--session-timeout-minutes must be a positive integer")
+  }
+  for (const item of options.reuseSessions) {
+    if (!/^[0-9a-fA-F-]{36}=ses_[A-Za-z0-9]+$/.test(item)) {
+      throw new Error("--reuse-session must be SUBMISSION_ID=SESSION_ID")
+    }
   }
   return options
 }
@@ -102,6 +119,19 @@ function parseRevisionRows(tsv) {
 function promptFor(row, constraints) {
   const folder = row.folderName.trim() || "<blank>"
   const userConstraints = constraints.trim() || "None"
+  if (row.reuseSessionId) {
+    const previousResult = row.previousResult || "unknown"
+    const previousNotes = row.previousNotes || "None"
+    return `Continue this same Terminal-Bench 2 revision update session.
+
+Submission ID: ${row.submissionId}
+Displayed folder name: ${folder}
+Previous result: ${previousResult}
+Previous notes: ${previousNotes}
+Additional user constraints: ${userConstraints}
+
+Reuse this session's existing context. Focus on the user's requested retry or repair, rerun the applicable validation, then execute exactly one selected update mode if validation passes. Do not ask the user from this child session, do not call the question tool, and do not wait for clarification; return WAITING, MANUAL ACTION, or BLOCKED when user input would be required. Return the required final response shape.`
+  }
   return `Update exactly one Terminal-Bench 2 revision submission.
 
 Submission ID: ${row.submissionId}
@@ -140,6 +170,19 @@ function textFromParts(parts) {
     .map((part) => part.text)
     .join("\n")
     .trim()
+}
+
+function latestAssistantAfter(messages, timeMs) {
+  return [...messages]
+    .reverse()
+    .find((message) => {
+      if (message.info.role !== "assistant") {
+        return false
+      }
+      const created = Number(message.info.time?.created || 0)
+      const threshold = created > 0 && created < 1_000_000_000_000 && timeMs > 1_000_000_000_000 ? timeMs / 1000 : timeMs
+      return created >= threshold
+    })
 }
 
 function tableEscape(value) {
@@ -222,7 +265,7 @@ async function refreshWorkerProgress(client, repoRoot, worker) {
   try {
     const response = await client.session.messages({ path: { id: worker.session.id }, query: { directory: repoRoot } })
     const messages = expectData(response, `messages for ${worker.session.id}`)
-    const assistant = [...messages].reverse().find((message) => message.info.role === "assistant")
+    const assistant = latestAssistantAfter(messages, worker.promptedAt)
     if (!assistant) {
       return false
     }
@@ -259,6 +302,125 @@ function nextLaunchableIndex(pending, active) {
     return !key || !blockedFolders.has(key)
   })
   return index >= 0 ? index : active.size === 0 ? 0 : -1
+}
+
+function resolveBatchDir(repoRoot, value) {
+  if (!value) {
+    return ""
+  }
+  if (path.isAbsolute(value)) {
+    return value
+  }
+  if (value.includes("/")) {
+    return path.resolve(repoRoot, value)
+  }
+  return path.join(repoRoot, ".opencode/cache/tb2-update-batches", value)
+}
+
+function emptySessionMap(batchId, sourceBatch = "") {
+  return {
+    batch_id: batchId,
+    created_at: new Date().toISOString(),
+    source_batch: sourceBatch,
+    submissions: {},
+  }
+}
+
+async function loadSessionMap(filePath) {
+  const text = await readFile(filePath, "utf8")
+  const parsed = JSON.parse(text)
+  if (!parsed || typeof parsed !== "object" || !parsed.submissions || typeof parsed.submissions !== "object") {
+    throw new Error(`invalid sessions map: ${filePath}`)
+  }
+  return parsed
+}
+
+async function writeSessionMap(filePath, sessionMap) {
+  await writeFile(filePath, `${JSON.stringify(sessionMap, null, 2)}\n`, "utf8")
+}
+
+function resultIsRetryable(result) {
+  return String(result || "").toUpperCase() === "BLOCKED"
+}
+
+function rowFromSessionEntry(submissionId, entry) {
+  return {
+    assignmentState: "NEEDS_REVISION",
+    folderName: entry.folder && entry.folder !== "-" ? entry.folder : "",
+    previousNotes: entry.notes || "",
+    previousResult: entry.result || "",
+    reuseSessionId: entry.session_id,
+    submissionId,
+  }
+}
+
+function parseReuseSessionOption(item) {
+  const separator = item.indexOf("=")
+  return {
+    sessionId: item.slice(separator + 1),
+    submissionId: item.slice(0, separator),
+  }
+}
+
+function buildReuseRows(priorMap, explicitReuseSessions, retryBlocked) {
+  const rows = []
+  const seen = new Set()
+  for (const item of explicitReuseSessions) {
+    const parsed = parseReuseSessionOption(item)
+    const prior = priorMap?.submissions?.[parsed.submissionId] || {}
+    rows.push(rowFromSessionEntry(parsed.submissionId, { ...prior, session_id: parsed.sessionId }))
+    seen.add(parsed.submissionId)
+  }
+
+  if (retryBlocked && priorMap) {
+    for (const [submissionId, entry] of Object.entries(priorMap.submissions)) {
+      if (seen.has(submissionId)) {
+        continue
+      }
+      if (entry?.session_id && resultIsRetryable(entry.result)) {
+        rows.push(rowFromSessionEntry(submissionId, entry))
+      }
+    }
+  }
+  return rows
+}
+
+async function buildRows(options) {
+  if (options.retryBlocked && !options.reuseBatch) {
+    throw new Error("--retry-blocked requires --reuse-batch")
+  }
+
+  let priorMap = null
+  if (options.reuseBatch) {
+    const priorBatchDir = resolveBatchDir(options.repoRoot, options.reuseBatch)
+    priorMap = await loadSessionMap(path.join(priorBatchDir, "sessions.json"))
+  }
+
+  if (options.reuseBatch || options.reuseSessions.length > 0) {
+    const rows = buildReuseRows(priorMap, options.reuseSessions, options.retryBlocked || options.reuseSessions.length === 0)
+    validateReuseRows(rows)
+    return { rows, sourceBatch: priorMap?.batch_id || options.reuseBatch || "explicit-sessions" }
+  }
+
+  return { rows: parseRevisionRows(runRevisionList(options.repoRoot)), sourceBatch: "" }
+}
+
+function validateReuseRows(rows) {
+  const submissions = new Set()
+  const sessions = new Set()
+  for (const row of rows) {
+    if (!row.reuseSessionId) {
+      throw new Error(`reuse row for ${row.submissionId} has no session_id`)
+    }
+    if (submissions.has(row.submissionId)) {
+      throw new Error(`duplicate reused submission: ${row.submissionId}`)
+    }
+    if (sessions.has(row.reuseSessionId)) {
+      throw new Error(`duplicate reused session: ${row.reuseSessionId}`)
+    }
+    submissions.add(row.submissionId)
+    sessions.add(row.reuseSessionId)
+  }
 }
 
 function parseUpdateResult(row, sessionId, text, errorNote = "") {
@@ -332,9 +494,10 @@ function renderConnectionHelp(serverUrl, batchDir, progressPath) {
     "## TB2 Update Batch Monitor",
     "",
     `- SDK server: ${serverUrl}`,
-    `- Attach TUI to running sessions: \`opencode attach ${serverUrl}\``,
+    `- Attach TUI to a running session: \`opencode attach ${serverUrl} --session <session_id>\``,
     "- Web command: `opencode web --port 0 --hostname 127.0.0.1` starts a separate web server; use `opencode attach` for these scheduler sessions.",
     `- Live progress file: \`${progressPath}\``,
+    `- Batch session map: \`${path.join(batchDir, "sessions.json")}\``,
     `- Session logs: \`${batchDir}\``,
     "- Terminal mode redraws the dashboard in place; captured/non-TTY mode writes live progress to the file and keeps stdout compact.",
     "- Child updater sessions are instructed not to ask questions; user-input cases should return WAITING, MANUAL ACTION, or BLOCKED.",
@@ -392,6 +555,21 @@ async function writeBatchEvent(eventsPath, message) {
   await appendFile(eventsPath, `${new Date().toISOString()}\t${message}\n`, "utf8")
 }
 
+function updateSessionRecord(sessionMap, worker, fields = {}) {
+  const existing = sessionMap.submissions[worker.row.submissionId] || {}
+  sessionMap.submissions[worker.row.submissionId] = {
+    ...existing,
+    folder: worker.row.folderName || existing.folder || "-",
+    previous_result: worker.row.previousResult || existing.previous_result || "",
+    previous_notes: worker.row.previousNotes || existing.previous_notes || "",
+    reused: Boolean(worker.row.reuseSessionId) || Boolean(existing.reused),
+    session_id: worker.session.id,
+    submission_id: worker.row.submissionId,
+    updated_at: new Date().toISOString(),
+    ...fields,
+  }
+}
+
 function renderProgress({ active, batchDir, maxWorkers, pending, results, serverUrl, total }) {
   const counts = countSummary(results)
   const lines = [
@@ -402,7 +580,7 @@ function renderProgress({ active, batchDir, maxWorkers, pending, results, server
     "",
     `Active: ${active.size}/${maxWorkers}   Done: ${results.length}/${total}   Pending: ${pending.length}   Updated: ${counts.checks}   Reviewer: ${counts.reviewer}   Manual: ${counts.manual}   Blocked: ${counts.blocked}   Waiting: ${counts.waiting}`,
     "",
-    `Attach: \`opencode attach ${serverUrl}\``,
+    `Attach: \`opencode attach ${serverUrl} --session <session_id>\``,
     `Logs: \`${batchDir}\``,
     "",
     "| Slot | Submission | Folder | Session ID | Status | Elapsed | Last event |",
@@ -444,7 +622,7 @@ async function collectWorker(client, repoRoot, batchDir, worker, errorNote = "")
   try {
     const response = await client.session.messages({ path: { id: worker.session.id }, query: { directory: repoRoot } })
     messages = expectData(response, `messages for ${worker.session.id}`)
-    const assistant = [...messages].reverse().find((message) => message.info.role === "assistant")
+    const assistant = latestAssistantAfter(messages, worker.promptedAt)
     finalText = assistant ? textFromParts(assistant.parts) : ""
     if (!errorNote && assistant?.info?.error) {
       errorNote = `Updater session ended with model/API error: ${JSON.stringify(assistant.info.error)}`
@@ -459,8 +637,15 @@ async function collectWorker(client, repoRoot, batchDir, worker, errorNote = "")
 async function launchWorker(client, repoRoot, row, constraints, slot) {
   const titleFolder = row.folderName.trim() || "blank-folder"
   const title = `TB2 update ${row.submissionId.slice(0, 8)} ${titleFolder}`
-  const sessionResponse = await client.session.create({ body: { title }, query: { directory: repoRoot } })
-  const session = expectData(sessionResponse, `create session for ${row.submissionId}`)
+  let session
+  if (row.reuseSessionId) {
+    const sessionResponse = await client.session.get({ path: { id: row.reuseSessionId }, query: { directory: repoRoot } })
+    session = expectData(sessionResponse, `get reused session for ${row.submissionId}`)
+  } else {
+    const sessionResponse = await client.session.create({ body: { title }, query: { directory: repoRoot } })
+    session = expectData(sessionResponse, `create session for ${row.submissionId}`)
+  }
+  const promptedAt = Date.now()
   const promptResponse = await client.session.promptAsync({
     body: {
       agent: "tb2-task-updater",
@@ -472,12 +657,11 @@ async function launchWorker(client, repoRoot, row, constraints, slot) {
   if (promptResponse.error) {
     throw new Error(`prompt async failed for ${row.submissionId}: ${JSON.stringify(promptResponse.error)}`)
   }
-  return { lastEvent: "prompt sent", row, session, slot, startedAt: Date.now(), status: "launched" }
+  return { lastEvent: row.reuseSessionId ? "reuse prompt sent" : "prompt sent", promptedAt, row, session, slot, startedAt: Date.now(), status: row.reuseSessionId ? "reused session" : "launched" }
 }
 
 async function runBatch(options) {
-  const tsv = runRevisionList(options.repoRoot)
-  const rows = parseRevisionRows(tsv)
+  const { rows, sourceBatch } = await buildRows(options)
   if (rows.length === 0) {
     console.log(renderFinalTable([]))
     return
@@ -496,7 +680,10 @@ async function runBatch(options) {
   await mkdir(batchDir, { recursive: true })
   const progressPath = path.join(batchDir, "progress.md")
   const eventsPath = path.join(batchDir, "events.log")
+  const sessionsPath = path.join(batchDir, "sessions.json")
+  const sessionMap = emptySessionMap(batchId, sourceBatch)
   await writeFile(eventsPath, "", "utf8")
+  await writeSessionMap(sessionsPath, sessionMap)
 
   let shutdownRequested = false
   let shutdownSignal = ""
@@ -515,6 +702,9 @@ async function runBatch(options) {
     const serverUrl = opencode.server.url || `http://127.0.0.1:${port}`
     console.log(renderConnectionHelp(serverUrl, batchDir, progressPath))
     await writeBatchEvent(eventsPath, `server=${serverUrl}`)
+    if (sourceBatch) {
+      await writeBatchEvent(eventsPath, `reuse-source-batch=${sourceBatch}`)
+    }
 
     const agentsResponse = await opencode.client.app.agents()
     const agents = expectData(agentsResponse, "agent list")
@@ -541,6 +731,8 @@ async function runBatch(options) {
         const slot = freeSlots.shift()
         const worker = await launchWorker(opencode.client, options.repoRoot, row, options.constraints, slot)
         active.set(worker.session.id, worker)
+        updateSessionRecord(sessionMap, worker, { status: "running" })
+        await writeSessionMap(sessionsPath, sessionMap)
         await writeBatchEvent(eventsPath, `launched submission=${row.submissionId} session=${worker.session.id} slot=${slot} active=${active.size} pending=${pending.length}`)
         await reporter.update(renderProgress(progressContext))
       }
@@ -571,6 +763,14 @@ async function runBatch(options) {
             `Updater session timed out after ${options.sessionTimeoutMinutes} minutes and was aborted.`,
           )
           results.push(result)
+          updateSessionRecord(sessionMap, worker, {
+            attempts: result.attempts,
+            notes: result.notes,
+            platform_action: result.platformAction,
+            result: result.result,
+            status: "finished",
+          })
+          await writeSessionMap(sessionsPath, sessionMap)
           active.delete(sessionId)
           freeSlots.push(worker.slot)
           freeSlots.sort((left, right) => left - right)
@@ -601,6 +801,14 @@ async function runBatch(options) {
         if (collectReason) {
           const result = await collectWorker(opencode.client, options.repoRoot, batchDir, worker)
           results.push(result)
+          updateSessionRecord(sessionMap, worker, {
+            attempts: result.attempts,
+            notes: result.notes,
+            platform_action: result.platformAction,
+            result: result.result,
+            status: "finished",
+          })
+          await writeSessionMap(sessionsPath, sessionMap)
           active.delete(sessionId)
           freeSlots.push(worker.slot)
           freeSlots.sort((left, right) => left - right)
@@ -630,14 +838,34 @@ async function runBatch(options) {
           `Scheduler received ${shutdownSignal}; updater session was aborted before completion.`,
         )
         results.push(result)
+        updateSessionRecord(sessionMap, worker, {
+          attempts: result.attempts,
+          notes: result.notes,
+          platform_action: result.platformAction,
+          result: result.result,
+          status: "aborted",
+        })
+        await writeSessionMap(sessionsPath, sessionMap)
         active.delete(sessionId)
         await writeBatchEvent(eventsPath, `aborted submission=${worker.row.submissionId} session=${sessionId}`)
       }
 
       while (pending.length > 0) {
         const row = pending.shift()
-        results.push(createSchedulerResult(row, "BLOCKED", `Scheduler received ${shutdownSignal}; submission was not launched.`))
+        const result = createSchedulerResult(row, "BLOCKED", `Scheduler received ${shutdownSignal}; submission was not launched.`, row.reuseSessionId || "-")
+        results.push(result)
+        sessionMap.submissions[row.submissionId] = {
+          folder: row.folderName || "-",
+          notes: result.notes,
+          result: result.result,
+          reused: Boolean(row.reuseSessionId),
+          session_id: row.reuseSessionId || "",
+          status: "not-launched",
+          submission_id: row.submissionId,
+          updated_at: new Date().toISOString(),
+        }
       }
+      await writeSessionMap(sessionsPath, sessionMap)
       process.exitCode = shutdownSignal === "SIGINT" ? 130 : 143
       await reporter.update(renderProgress(progressContext))
     }
@@ -646,6 +874,7 @@ async function runBatch(options) {
     console.log(`Session logs: ${batchDir}`)
     console.log(`Live progress: ${progressPath}`)
     console.log(`Event log: ${eventsPath}`)
+    console.log(`Session map: ${sessionsPath}`)
     console.log("")
     console.log(renderFinalTable(results))
   } finally {
