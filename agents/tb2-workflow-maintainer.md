@@ -60,9 +60,9 @@ Current flow:
 3. `tb2-task-builder` initializes a task, authors layered hidden bugs, uses TB2 component skills, runs validation, and writes humanized field answers.
 4. The parent invokes `tb2-task-reviewer` for static evidence-backed review, sends all findings to the builder, and repeats repair and review until clean or blocked.
 5. The parent asks before `stb submissions create`, and only after a clean review.
-6. `/update-task` sends the request to `tb2-update-task-orchestrator`, which lists only `NEEDS_REVISION` submissions and delegates them in batches of at most four parallel updater agents.
+6. `/update-task` sends the request to `tb2-update-task-orchestrator`, which lists only `NEEDS_REVISION` submissions without the slow all-folder-name lookup and delegates them in batches of at most four parallel updater agents.
 7. `/update-one-task <submission_id>` sends exactly one supplied submission to `tb2-task-updater` without listing the batch queue.
-8. Each `tb2-task-updater` fetches feedback and chooses one owned action: repair and rerun checks with `--no-send-to-reviewer`, send an already-clean task to reviewer, prepare a manual rubric handoff, or block. Applicable validation must pass before either update mode; the helper retries upload at most five times.
+8. Each `tb2-task-updater` resolves its local task, downloading the submitted task into `tasks/` when absent, then fetches feedback and chooses one owned action: repair and rerun checks with `--no-send-to-reviewer`, send an already-clean task to reviewer, prepare a manual rubric handoff, or block. Applicable validation must pass before either update mode; the helper retries upload at most five times.
 9. `/task-proposal` sends the request to `tb2-task-proposer`, which follows the local profile, prints the selected proposal fields in chat, iterates until the user reports all four platform checks pass, and invokes builder/reviewer repair only after explicit approval.
 
 Before editing:

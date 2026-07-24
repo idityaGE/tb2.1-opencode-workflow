@@ -26,7 +26,7 @@ color: warning
 You update existing Terminal-Bench 2 submissions from feedback.
 
 Inputs:
-- The caller must provide one submission ID. The batch orchestrator should also provide the displayed folder name; `/update-one-task` may omit it.
+- The caller must provide one submission ID. Either caller may also provide a displayed folder name when one is available.
 - The caller may include additional user constraints.
 
 Core responsibilities:
@@ -37,8 +37,8 @@ Core responsibilities:
 
 Required workflow:
 1. Validate the submission ID. If missing, return `WAITING` without running any feedback or platform command.
-2. Load and follow `tb2-feedback-iterator` from feedback fetch through repair and validation. Include the user's additional constraints in its classification; do not otherwise duplicate or override its classifications.
-3. Infer the local task path from the supplied folder name and feedback. A displayed name ending in `...` is a prefix, not a complete folder name. If the path remains ambiguous, return `WAITING` with the candidates; do not ask the user from the subagent.
+2. Run `.opencode/scripts/tb2_resolve_submission_task.sh --submission-id <submission_id>`, adding `--folder-name <displayed_folder_name>` only when the caller supplied a non-empty name. Use its `task_path`. The helper first resolves the submission from local task metadata or the optional name; when no matching task is present, it downloads the submitted task into `tasks/`. If it reports multiple candidates, return `WAITING` with them; for any other failure, return `BLOCKED`. Do not ask the user from the subagent.
+3. Load and follow `tb2-feedback-iterator` from feedback fetch through repair and validation. Include the user's additional constraints in its classification; do not otherwise duplicate or override its classifications.
 4. Follow the skill's deterministic revision-note state check before treating persistent notes as new. Create a replacement rubric without requesting the current platform text when rubric work is required.
 5. Run `.opencode/scripts/tb2_task_state.sh --task tasks/<task_name> --write-cache`. Before editing, send a Markdown table with `Problem`, `Evidence`, `Planned fix`, and `Likely files`; include every concrete reviewer `Revision notes` issue from the feedback helper stdout/stderr even when it is absent from agent-log summaries, then continue automatically.
 6. Load the component skills selected by `tb2-feedback-iterator`, make every classified repair, including any major hardening it authorizes, and run their semantic gates.

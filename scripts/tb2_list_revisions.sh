@@ -21,7 +21,7 @@ if [ "$#" -gt 0 ]; then
 fi
 
 set +e
-list_output="$(stb submissions list -p "$TB2_PROJECT_ID" --show-folder-names 2>&1)"
+list_output="$(stb submissions list -p "$TB2_PROJECT_ID" 2>&1)"
 list_rc=$?
 set -e
 
@@ -38,10 +38,27 @@ trim() {
 }
 
 printf 'submission_id\tfolder_name\tassignment_state\n'
-while IFS='│' read -r _ row_number submission_id created_at folder_name assignment_state payment_status _; do
-  submission_id="$(trim "${submission_id:-}")"
-  folder_name="$(trim "${folder_name:-}")"
-  assignment_state="$(trim "${assignment_state:-}")"
+submission_index=-1
+folder_index=-1
+assignment_index=-1
+while IFS='│' read -r -a cells; do
+  for ((index = 0; index < ${#cells[@]}; index++)); do
+    cell="$(trim "${cells[$index]}")"
+    case "$cell" in
+      "Submission ID") submission_index=$index ;;
+      "Folder Name") folder_index=$index ;;
+      "Assignment State") assignment_index=$index ;;
+    esac
+  done
+
+  [ "$submission_index" -ge 0 ] && [ "$assignment_index" -ge 0 ] || continue
+  submission_id="$(trim "${cells[$submission_index]:-}")"
+  assignment_state="$(trim "${cells[$assignment_index]:-}")"
+  folder_name=""
+  if [ "$folder_index" -ge 0 ]; then
+    folder_name="$(trim "${cells[$folder_index]:-}")"
+  fi
+
   if [ "$assignment_state" = "NEEDS_REVISION" ] \
     && [[ "$submission_id" =~ ^[0-9a-fA-F-]{36}$ ]]; then
     printf '%s\t%s\t%s\n' "$submission_id" "$folder_name" "$assignment_state"

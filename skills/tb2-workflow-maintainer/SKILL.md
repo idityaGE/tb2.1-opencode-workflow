@@ -43,7 +43,8 @@ Create-task backend scripts:
 Update-only feedback scripts:
 - `tb2_status_iterate.sh`: feedback/update helper.
 - `tb2_quality_report.py`: feedback summary helper.
-- `tb2_list_revisions.sh`: lists only `NEEDS_REVISION` submissions for the configured project.
+- `tb2_list_revisions.sh`: lists only `NEEDS_REVISION` submissions for the configured project without the slow all-folder-name lookup.
+- `tb2_resolve_submission_task.sh`: resolves an update submission to a local task and downloads it into `tasks/` when absent.
 - `tb2_update_state.py`: tracks addressed revision-note hashes and pending rubric handoffs under the ignored workflow cache.
 
 ## Flow
@@ -54,7 +55,7 @@ Update-only feedback scripts:
 4. The parent invokes `tb2-task-reviewer`, sends all static review findings to the builder, and repeats repair and review until clean or blocked.
 5. Parent reports a compact result and asks before platform submission only after a clean review.
 6. User runs `/update-task`.
-7. `tb2-update-task-orchestrator` lists only `NEEDS_REVISION` submissions and delegates batches of at most four parallel `tb2-task-updater` calls. Each updater classifies one submission, validates any task action, and either reruns checks, sends a clean task to reviewer, returns a manual rubric handoff, or blocks.
+7. `tb2-update-task-orchestrator` lists only `NEEDS_REVISION` submissions without requesting all folder names and delegates batches of at most four parallel `tb2-task-updater` calls. Each updater resolves or downloads its task, classifies one submission, validates any task action, and either reruns checks, sends a clean task to reviewer, returns a manual rubric handoff, or blocks.
 8. User may instead run `/update-one-task <submission_id>` to invoke the same updater for exactly one submission without listing the batch queue.
 9. `/task-proposal` applies the local profile, emits proposal fields in chat, revises them from platform feedback until all four checks pass, then runs builder/reviewer repair only after explicit user approval.
 
