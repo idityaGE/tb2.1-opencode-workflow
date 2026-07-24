@@ -8,12 +8,8 @@ permission:
   list: allow
   edit: deny
   task: deny
-  question: deny
-  webfetch: deny
-  websearch: deny
-  skill: deny
   bash:
-    "*": deny
+    "*": ask
     "du -ab tasks/*/environment": allow
 steps: 60
 color: warning

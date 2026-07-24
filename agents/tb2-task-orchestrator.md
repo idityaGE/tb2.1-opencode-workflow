@@ -14,10 +14,7 @@ permission:
     "*": deny
     "tb2-task-builder": allow
     "tb2-task-reviewer": allow
-  bash:
-    "*": allow
-    "pwd": allow
-    "stb submissions create *": ask
+  bash: allow
   edit: allow
 color: accent
 ---

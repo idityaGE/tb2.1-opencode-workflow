@@ -6,14 +6,12 @@ permission:
   glob: allow
   grep: allow
   list: allow
-  edit:
-    "*": ask
-    "tasks/**": allow
-    ".opencode/cache/tb2-rubrics/**": allow
+  edit: allow
   bash: allow
   external_directory:
     "/tmp/feedback_*": allow
     "/tmp/feedback_*/**": allow
+    ".opencode/cache": allow
   webfetch: allow
   websearch: allow
   skill: allow
