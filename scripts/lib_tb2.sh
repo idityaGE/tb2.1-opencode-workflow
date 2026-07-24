@@ -2,6 +2,12 @@
 set -euo pipefail
 
 TB2_PROJECT_ID="bfe79c33-8ab0-4061-9849-08d3207c9927"
+TB2_PLATFORM_RUFF_SELECT="I,UP022,S110,BLE001,PLW1510,PERF102,C408"
+
+tb2_run_platform_ruff() {
+  local task_path="$1"
+  ruff check --extend-select "$TB2_PLATFORM_RUFF_SELECT" "$task_path"
+}
 
 tb2_random_time_minutes() {
   local bucket

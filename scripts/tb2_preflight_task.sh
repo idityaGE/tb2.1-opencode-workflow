@@ -41,10 +41,8 @@ python3 "$SCRIPT_DIR/tb2_task_lint.py" --context "$context" "$task_path"
 
 printf '\n== Fast ruff check ==\n'
 if command -v ruff >/dev/null 2>&1; then
-  ruff_paths=("$SCRIPT_DIR")
-  [ -d "$task_path/tests" ] && ruff_paths+=("$task_path/tests")
-  [ -d "$task_path/steps" ] && ruff_paths+=("$task_path/steps")
-  ruff check --extend-select I "${ruff_paths[@]}"
+  ruff check --extend-select I "$SCRIPT_DIR"
+  tb2_run_platform_ruff "$task_path"
 else
   printf 'ruff not installed; skipping ruff check\n'
 fi
