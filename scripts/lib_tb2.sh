@@ -10,7 +10,7 @@ tb2_require_ruff() {
 tb2_run_platform_ruff() {
   local task_path="$1"
   tb2_require_ruff
-  ruff check --isolated --preview --select I,UP,PLW,ISC "$task_path"
+  ruff check --isolated --preview --select I,UP,PLW,ISC,PERF "$task_path"
 }
 
 tb2_random_time_minutes() {
