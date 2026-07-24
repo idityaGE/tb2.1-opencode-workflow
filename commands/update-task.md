@@ -1,11 +1,11 @@
 ---
-description: Process all TB2 submissions needing revision with up to four parallel updater agents.
+description: Process all TB2 submissions needing revision with the rolling SDK updater scheduler.
 agent: tb2-update-task-orchestrator
 ---
 
 # /update-task
 
-Process every Terminal-Bench 2 submission currently in `NEEDS_REVISION`.
+Process every Terminal-Bench 2 submission currently in `NEEDS_REVISION` through the rolling SDK updater scheduler.
 
 Additional user constraints: `$ARGUMENTS`
 
