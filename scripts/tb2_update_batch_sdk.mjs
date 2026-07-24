@@ -206,6 +206,10 @@ function displayFolder(value) {
   return text.length > 24 ? `${text.slice(0, 21)}...` : text
 }
 
+function attachCommand(serverUrl, sessionId) {
+  return `opencode attach ${serverUrl} --session ${sessionId}`
+}
+
 function formatElapsed(ms) {
   const totalSeconds = Math.max(0, Math.floor(ms / 1000))
   const hours = Math.floor(totalSeconds / 3600)
@@ -494,11 +498,12 @@ function renderConnectionHelp(serverUrl, batchDir, progressPath) {
     "## TB2 Update Batch Monitor",
     "",
     `- SDK server: ${serverUrl}`,
-    `- Attach TUI to a running session: \`opencode attach ${serverUrl} --session <session_id>\``,
+    `- Attach TUI to a running session: \`${attachCommand(serverUrl, "<session_id>")}\``,
     "- Web command: `opencode web --port 0 --hostname 127.0.0.1` starts a separate web server; use `opencode attach` for these scheduler sessions.",
     `- Live progress file: \`${progressPath}\``,
     `- Batch session map: \`${path.join(batchDir, "sessions.json")}\``,
     `- Session logs: \`${batchDir}\``,
+    "- Exact per-session attach commands are printed when sessions launch and repeated in the live progress file.",
     "- Terminal mode redraws the dashboard in place; captured/non-TTY mode writes live progress to the file and keeps stdout compact.",
     "- Child updater sessions are instructed not to ask questions; user-input cases should return WAITING, MANUAL ACTION, or BLOCKED.",
   ].join("\n")
@@ -580,7 +585,7 @@ function renderProgress({ active, batchDir, maxWorkers, pending, results, server
     "",
     `Active: ${active.size}/${maxWorkers}   Done: ${results.length}/${total}   Pending: ${pending.length}   Updated: ${counts.checks}   Reviewer: ${counts.reviewer}   Manual: ${counts.manual}   Blocked: ${counts.blocked}   Waiting: ${counts.waiting}`,
     "",
-    `Attach: \`opencode attach ${serverUrl} --session <session_id>\``,
+    `Attach: \`${attachCommand(serverUrl, "<session_id>")}\``,
     `Logs: \`${batchDir}\``,
     "",
     "| Slot | Submission | Folder | Session ID | Status | Elapsed | Last event |",
@@ -595,6 +600,11 @@ function renderProgress({ active, batchDir, maxWorkers, pending, results, server
       lines.push(
         `| ${worker.slot} | ${tableEscape(shortSubmission(worker.row.submissionId))} | ${tableEscape(displayFolder(worker.row.folderName))} | ${tableEscape(worker.session.id)} | ${tableEscape(worker.status)} | ${formatElapsed(Date.now() - worker.startedAt)} | ${compactEvent(worker.lastEvent)} |`,
       )
+    }
+
+    lines.push("", "Active attach commands:", "")
+    for (const worker of workers) {
+      lines.push(`- ${shortSubmission(worker.row.submissionId)} (${displayFolder(worker.row.folderName)}): \`${attachCommand(serverUrl, worker.session.id)}\``)
     }
   }
 
@@ -733,6 +743,9 @@ async function runBatch(options) {
         active.set(worker.session.id, worker)
         updateSessionRecord(sessionMap, worker, { status: "running" })
         await writeSessionMap(sessionsPath, sessionMap)
+        if (!process.stdout.isTTY) {
+          console.log(`Attach ${shortSubmission(row.submissionId)} (${displayFolder(row.folderName)}): ${attachCommand(serverUrl, worker.session.id)}`)
+        }
         await writeBatchEvent(eventsPath, `launched submission=${row.submissionId} session=${worker.session.id} slot=${slot} active=${active.size} pending=${pending.length}`)
         await reporter.update(renderProgress(progressContext))
       }
