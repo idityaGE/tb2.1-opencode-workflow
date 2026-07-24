@@ -90,6 +90,11 @@ Score 2/31/36/37/38 strictly from this map. Do not assert coverage you did not m
 not complete an alignment criterion: scan every map row and every semantically distinct assertion, then
 include all discovered gaps and phantom-spec assertions in the same review output.
 
+For criterion 38, a representative example is not enough. If any req-gap exists, the criterion 38 FAIL
+line and REQUIRED FIXES must enumerate every uncovered REQUIREMENTS row from the evidence map, each with
+the source quote and a concrete verifier behavior to add or the exact public requirement to narrow/remove.
+Do not write only "add tests for all requirements" or stop after the first gap.
+
 ---
 
 ## 1. Severity decision rules (mechanical — no judgment)
@@ -480,6 +485,9 @@ LOW FIXES TO INCLUDE (if going to revision): <list or none>
 Rules for output: be specific in every FAIL and fix — name the file, line, and exact change. Output
 nothing outside this format. If the audit gate did not fully pass, do not output a verdict — instead
 report which gate item failed and what file you still need.
+
+When criterion 38 FAILs, REQUIRED FIXES must contain a `Criterion 38 req-gaps:` subsection with one entry
+per uncovered requirement row so the repair agent can fix all coverage gaps in one pass.
 
 ---
 

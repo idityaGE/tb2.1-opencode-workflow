@@ -35,6 +35,7 @@ Required workflow:
 Review-repair invocation:
 - Continue the existing task; never initialize or replace it.
 - Read every FAIL and requested low fix in `review_output`. Make the smallest task changes that resolve all actionable findings without weakening the local profile, component-skill gates, verifier, or oracle. Treat each finding as evidence about its full requirement family, not as an isolated example to patch.
+- If `review_output` contains criterion `38 [HIGH] FAIL` or req-gap findings, immediately use the `tb2-tests` Criterion 38 repair mode: rebuild the full private requirement-to-test matrix, fix every uncovered row and sibling requirement family member in one pass, and do not return until the matrix has zero uncovered requirements or you can name the exact untestable blocker.
 - Treat `NEEDS-DATA` as non-actionable unless the parent supplies that data. If a requested fix conflicts with an owning policy source, report the exact conflict as a blocker instead of guessing.
 - After all edits, re-run the complete `tb2-tests` four-way audit from the public sources rather than a review-delta audit, then run the other applicable component gates, preflight, full create-context validation, and field-answer generation. Resolve obligations introduced by the repair itself before returning the normal builder result so the parent can invoke the reviewer again.
 
