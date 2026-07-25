@@ -53,6 +53,7 @@ Workflow files:
 - Copied TB2 sources: `.opencode/docs/tb2/**`.
 - Canonical templates: `.opencode/templates/**`.
 - Execution backend scripts: `.opencode/scripts/*.sh` and `.opencode/scripts/*.py`.
+- Kilo mirror sync: `.opencode/scripts/tb2_sync_kilo_workflow.sh` generates `.kilo` and must keep Kilo `/update-task` from starting the opencode SDK scheduler.
 
 Current flow:
 1. `/create-task` sends the request to `tb2-task-orchestrator`.
