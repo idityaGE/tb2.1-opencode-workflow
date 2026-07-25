@@ -10,11 +10,14 @@ const DEFAULT_POLL_SECONDS = 15
 const DEFAULT_SESSION_TIMEOUT_MINUTES = 360
 
 function usage() {
-  return `Usage: tb2_update_batch_sdk.mjs --repo-root PATH [--constraints TEXT] [--max-workers N] [--poll-seconds N] [--session-timeout-minutes N] [--dry-run] [--reuse-batch BATCH_ID_OR_DIR] [--retry-blocked] [--reuse-session SUBMISSION_ID=SESSION_ID]
+  return `Usage: tb2_update_batch_sdk.mjs --repo-root PATH [--constraints TEXT] [--pool N|--max-workers N] [--poll-seconds N] [--session-timeout-minutes N] [--dry-run] [--reuse-batch BATCH_ID_OR_DIR] [--retry-blocked] [--reuse-session SUBMISSION_ID=SESSION_ID]
 
 Runs the NEEDS_REVISION queue through independent opencode SDK sessions using
 tb2-task-updater, keeping up to N active sessions and launching the next
 submission as soon as one session becomes idle.
+
+During a running batch, add an active session ID or full submission ID to the
+batch stop-sessions.txt file to abort only that updater session.
 
 When --reuse-batch or --reuse-session is supplied, resumes the referenced
 batch-local updater sessions instead of creating fresh sessions.`
@@ -35,11 +38,11 @@ function parseArgs(argv) {
 
   for (let index = 0; index < argv.length; index++) {
     const arg = argv[index]
-    if (arg === "--constraints") {
+    if (arg === "--constraints" || arg === "--contraints") {
       options.constraints = argv[++index] ?? ""
     } else if (arg === "--dry-run") {
       options.dryRun = true
-    } else if (arg === "--max-workers") {
+    } else if (arg === "--max-workers" || arg === "--pool") {
       options.maxWorkers = Number.parseInt(argv[++index] ?? "", 10)
     } else if (arg === "--poll-seconds") {
       options.pollSeconds = Number.parseInt(argv[++index] ?? "", 10)
@@ -64,8 +67,8 @@ function parseArgs(argv) {
   if (!options.repoRoot) {
     throw new Error("--repo-root is required")
   }
-  if (!Number.isInteger(options.maxWorkers) || options.maxWorkers < 1 || options.maxWorkers > 4) {
-    throw new Error("--max-workers must be an integer from 1 to 4")
+  if (!Number.isInteger(options.maxWorkers) || options.maxWorkers < 1) {
+    throw new Error("--pool/--max-workers must be a positive integer")
   }
   if (!Number.isInteger(options.pollSeconds) || options.pollSeconds < 1) {
     throw new Error("--poll-seconds must be a positive integer")
@@ -443,7 +446,7 @@ function parseUpdateResult(row, sessionId, text, errorNote = "") {
     platformAction = "failed"
   }
 
-  const result = (statusMatch?.[1] ?? (errorNote ? "BLOCKED" : "BLOCKED")).toUpperCase()
+  const result = (errorNote ? "BLOCKED" : statusMatch?.[1] ?? "BLOCKED").toUpperCase()
   const notes = errorNote || notesMatch?.[1] || "Could not parse updater final response; see session log."
   return {
     attempts: attemptsMatch ? Number.parseInt(attemptsMatch[1], 10) : 0,
@@ -493,7 +496,7 @@ function renderFinalTable(results) {
   return lines.join("\n")
 }
 
-function renderConnectionHelp(serverUrl, batchDir, progressPath) {
+function renderConnectionHelp(serverUrl, batchDir, progressPath, stopPath) {
   return [
     "## TB2 Update Batch Monitor",
     "",
@@ -501,6 +504,7 @@ function renderConnectionHelp(serverUrl, batchDir, progressPath) {
     `- Attach TUI to a running session: \`${attachCommand(serverUrl, "<session_id>")}\``,
     "- Web command: `opencode web --port 0 --hostname 127.0.0.1` starts a separate web server; use `opencode attach` for these scheduler sessions.",
     `- Live progress file: \`${progressPath}\``,
+    `- Stop one updater session: add its active session ID or full submission ID to \`${stopPath}\``,
     `- Batch session map: \`${path.join(batchDir, "sessions.json")}\``,
     `- Session logs: \`${batchDir}\``,
     "- Exact per-session attach commands are printed when sessions launch and repeated in the live progress file.",
@@ -575,7 +579,7 @@ function updateSessionRecord(sessionMap, worker, fields = {}) {
   }
 }
 
-function renderProgress({ active, batchDir, maxWorkers, pending, results, serverUrl, total }) {
+function renderProgress({ active, batchDir, maxWorkers, pending, results, serverUrl, stopPath, total }) {
   const counts = countSummary(results)
   const lines = [
     "",
@@ -587,6 +591,7 @@ function renderProgress({ active, batchDir, maxWorkers, pending, results, server
     "",
     `Attach: \`${attachCommand(serverUrl, "<session_id>")}\``,
     `Logs: \`${batchDir}\``,
+    `Stop one: add an active session ID or full submission ID to \`${stopPath}\``,
     "",
     "| Slot | Submission | Folder | Session ID | Status | Elapsed | Last event |",
     "|---:|---|---|---|---|---:|---|",
@@ -624,6 +629,70 @@ async function writeSessionLog(batchDir, worker, messages, finalText) {
   const base = path.join(batchDir, `${worker.row.submissionId}-${worker.session.id}`)
   await writeFile(`${base}.txt`, finalText || "", "utf8")
   await writeFile(`${base}.json`, JSON.stringify({ row: worker.row, session: worker.session, messages }, null, 2), "utf8")
+}
+
+async function readStopRequests(stopPath, seen) {
+  let text = ""
+  try {
+    text = await readFile(stopPath, "utf8")
+  } catch (error) {
+    if (error?.code === "ENOENT") {
+      return []
+    }
+    throw error
+  }
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.replace(/#.*/, "").trim())
+    .filter((line) => line && !seen.has(line))
+}
+
+function workerMatchesStopRequest(worker, request) {
+  return worker.session.id === request || worker.row.submissionId === request
+}
+
+async function applyStopRequests({ active, batchDir, client, eventsPath, freeSlots, progressContext, reporter, repoRoot, results, seenStopRequests, sessionMap, sessionsPath, stopPath }) {
+  const requests = await readStopRequests(stopPath, seenStopRequests)
+  for (const request of requests) {
+    seenStopRequests.add(request)
+    const matches = [...active.entries()].filter(([, worker]) => workerMatchesStopRequest(worker, request))
+    if (matches.length === 0) {
+      await writeBatchEvent(eventsPath, `stop-request-not-active target=${request}`)
+      continue
+    }
+
+    for (const [sessionId, worker] of matches) {
+      worker.status = "aborting"
+      worker.lastEvent = `stop requested for ${request}`
+      await reporter.update(renderProgress(progressContext))
+      try {
+        await client.session.abort({ path: { id: sessionId }, query: { directory: repoRoot } })
+      } catch (error) {
+        await writeBatchEvent(eventsPath, `abort-failed submission=${worker.row.submissionId} session=${sessionId} target=${request} error=${error instanceof Error ? error.message : String(error)}`)
+      }
+      const result = await collectWorker(
+        client,
+        repoRoot,
+        batchDir,
+        worker,
+        `Stop requested for ${request}; updater session was aborted before completion.`,
+      )
+      results.push(result)
+      updateSessionRecord(sessionMap, worker, {
+        attempts: result.attempts,
+        notes: result.notes,
+        platform_action: result.platformAction,
+        result: result.result,
+        status: "aborted",
+      })
+      await writeSessionMap(sessionsPath, sessionMap)
+      active.delete(sessionId)
+      freeSlots.push(worker.slot)
+      freeSlots.sort((left, right) => left - right)
+      await writeBatchEvent(eventsPath, `aborted-by-stop-request submission=${worker.row.submissionId} session=${sessionId} target=${request} active=${active.size} pending=${progressContext.pending.length}`)
+      await reporter.update(renderProgress(progressContext))
+    }
+  }
 }
 
 async function collectWorker(client, repoRoot, batchDir, worker, errorNote = "") {
@@ -691,8 +760,10 @@ async function runBatch(options) {
   const progressPath = path.join(batchDir, "progress.md")
   const eventsPath = path.join(batchDir, "events.log")
   const sessionsPath = path.join(batchDir, "sessions.json")
+  const stopPath = path.join(batchDir, "stop-sessions.txt")
   const sessionMap = emptySessionMap(batchId, sourceBatch)
   await writeFile(eventsPath, "", "utf8")
+  await writeFile(stopPath, "# Add one active session ID or full submission ID per line to abort only that updater session.\n", "utf8")
   await writeSessionMap(sessionsPath, sessionMap)
 
   let shutdownRequested = false
@@ -710,7 +781,7 @@ async function runBatch(options) {
   const reporter = createProgressReporter(progressPath)
   try {
     const serverUrl = opencode.server.url || `http://127.0.0.1:${port}`
-    console.log(renderConnectionHelp(serverUrl, batchDir, progressPath))
+    console.log(renderConnectionHelp(serverUrl, batchDir, progressPath, stopPath))
     await writeBatchEvent(eventsPath, `server=${serverUrl}`)
     if (sourceBatch) {
       await writeBatchEvent(eventsPath, `reuse-source-batch=${sourceBatch}`)
@@ -726,8 +797,9 @@ async function runBatch(options) {
     const active = new Map()
     const freeSlots = Array.from({ length: options.maxWorkers }, (_, index) => index + 1)
     const results = []
+    const seenStopRequests = new Set()
     const timeoutMs = options.sessionTimeoutMinutes * 60 * 1000
-    const progressContext = { active, batchDir, maxWorkers: options.maxWorkers, pending, results, serverUrl, total: rows.length }
+    const progressContext = { active, batchDir, maxWorkers: options.maxWorkers, pending, results, serverUrl, stopPath, total: rows.length }
     await reporter.update(renderProgress(progressContext))
 
     while (pending.length > 0 || active.size > 0) {
@@ -758,7 +830,16 @@ async function runBatch(options) {
         continue
       }
 
+      await applyStopRequests({ active, batchDir, client: opencode.client, eventsPath, freeSlots, progressContext, reporter, repoRoot: options.repoRoot, results, seenStopRequests, sessionMap, sessionsPath, stopPath })
+      if (active.size === 0) {
+        continue
+      }
+
       await sleep(options.pollSeconds * 1000)
+      await applyStopRequests({ active, batchDir, client: opencode.client, eventsPath, freeSlots, progressContext, reporter, repoRoot: options.repoRoot, results, seenStopRequests, sessionMap, sessionsPath, stopPath })
+      if (active.size === 0) {
+        continue
+      }
       const statusResponse = await opencode.client.session.status({ query: { directory: options.repoRoot } })
       const statuses = expectData(statusResponse, "session status")
 

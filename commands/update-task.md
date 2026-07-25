@@ -5,7 +5,7 @@ agent: tb2-update-task-orchestrator
 
 # /update-task
 
-Process every Terminal-Bench 2 submission currently in `NEEDS_REVISION` through the rolling SDK updater scheduler, or reuse updater sessions from an explicitly named prior batch/session.
+Process every Terminal-Bench 2 submission currently in `NEEDS_REVISION` through the rolling SDK updater scheduler, or reuse updater sessions from an explicitly named prior batch/session. The default pool is 4 active updater sessions; pass `--pool <n>` to override it for this invocation.
 
 Additional user constraints: `$ARGUMENTS`
 

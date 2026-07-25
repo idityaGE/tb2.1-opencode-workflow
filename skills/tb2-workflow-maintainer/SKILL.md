@@ -19,7 +19,7 @@ Primary opencode files:
 - `.opencode/agents/tb2-task-proposer.md`: follows the local workflow profile, prints platform fields, iterates on four proposal checks, and invokes builder only after all pass and the user approves.
 - `.opencode/agents/tb2-task-builder.md`: creates layered hidden-bug task files, uses component skills, validates structural/NOP/oracle behavior, writes humanized field answers.
 - `.opencode/agents/tb2-task-reviewer.md`: statically applies the local Edition 2 review prompt and returns evidence-backed findings for builder repair.
-- `.opencode/agents/tb2-update-task-orchestrator.md`: lists revision submissions and delegates at most four updater agents in parallel.
+- `.opencode/agents/tb2-update-task-orchestrator.md`: lists revision submissions and delegates updater agents through the SDK scheduler with a default pool of four parallel sessions and an invocation-time `--pool` override.
 - `.opencode/agents/tb2-task-updater.md`: handles one submission by repairing and checking, sending a clean task to review, or preparing a manual rubric handoff.
 - `.opencode/agents/tb2-workflow-maintainer.md`: modifies workflow infrastructure.
 - `.opencode/skills/tb2-*/SKILL.md`: component workflow guidance.
@@ -55,7 +55,7 @@ Update-only feedback scripts:
 4. The parent invokes `tb2-task-reviewer`, sends all static review findings to the builder, and repeats repair and review until clean or blocked.
 5. Parent reports a compact result and asks before platform submission only after a clean review.
 6. User runs `/update-task`.
-7. `tb2-update-task-orchestrator` lists only `NEEDS_REVISION` submissions without requesting all folder names and delegates batches of at most four parallel `tb2-task-updater` calls. Each updater resolves or downloads its task, classifies one submission, validates any task action, and either reruns checks, sends a clean task to reviewer, returns a manual rubric handoff, or blocks.
+7. `tb2-update-task-orchestrator` lists only `NEEDS_REVISION` submissions without requesting all folder names and delegates parallel `tb2-task-updater` calls through the SDK scheduler. The default pool is four active updater sessions, and `/update-task --pool <n>` overrides it for that invocation. Each updater resolves or downloads its task, classifies one submission, validates any task action, and either reruns checks, sends a clean task to reviewer, returns a manual rubric handoff, or blocks. A running batch can abort one active updater by writing its active session ID or full submission ID to the batch `stop-sessions.txt` file.
 8. User may instead run `/update-one-task <submission_id>` to invoke the same updater for exactly one submission without listing the batch queue.
 9. `/task-proposal` applies the local profile, emits proposal fields in chat, revises them from platform feedback until all four checks pass, then runs builder/reviewer repair only after explicit user approval.
 
