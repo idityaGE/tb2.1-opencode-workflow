@@ -6,15 +6,15 @@ Live view of which task categories and policies are currently open for new submi
 
 | Category | Status | Since |
 |---|---|---|
+| `machine-learning` | ✅ Open | — |
+| `games` | ✅ Open | — |
+| `system-administration` | ✅ Open | — |
+| `build-and-dependency-management` | 🚫 Blocked | Jul 24, 2026 |
+| `scientific-computing` | 🚫 Blocked | Jul 24, 2026 |
+| `security` | 🚫 Blocked | Jul 24, 2026 |
 | `data-processing` | 🚫 Blocked | Jul 10, 2026 |
 | `debugging` | 🚫 Blocked | Jun 18, 2026 |
 | `software-engineering` | 🚫 Blocked | Jun 18, 2026 |
-| `system-administration` | ✅ Open | — |
-| `build-and-dependency-management` | ✅ Open | — |
-| `games` | ✅ Open | — |
-| `machine-learning` | ✅ Open | — |
-| `security` | ✅ Open | — |
-| `scientific-computing` | ✅ Open | — |
 
 > **Note:** New **milestone tasks** are also blocked (since Jun 29, 2026) regardless of category. Blocked categories are hidden from the [Task Gallery](/portal/tasks). When a block lifts, this page and the [Changelog](/portal/changelog) will announce it.
 

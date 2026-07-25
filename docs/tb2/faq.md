@@ -156,7 +156,7 @@ It's possible, but **not encouraged** — expect API errors and much faster key 
 ### Blocked Categories
 
 **Which categories are currently blocked?**
-As of Jul 10, 2026: **`debugging`**, **`software-engineering`** (both since Jun 18, 2026), and **`data-processing`** (since Jul 10) are paused — no net-new submissions, and they're hidden from the Task Gallery. **New milestone tasks are also blocked** (Jun 29). Tasks already in your revision queue or awaiting review continue through to Accepted as normal. Check the [Task Category Status](/portal/category-status) page for the live list.
+As of Jul 24, 2026: **`build-and-dependency-management`**, **`scientific-computing`**, and **`security`** are paused, joining **`debugging`**, **`software-engineering`** (both since Jun 18, 2026), and **`data-processing`** (since Jul 10). Net-new submissions are open only for **`machine-learning`**, **`games`**, and **`system-administration`**. **New milestone tasks are also blocked** (Jun 29). Tasks already in your revision queue or awaiting review continue through to Accepted as normal. Check the [Task Category Status](/portal/category-status) page for the live list.
 
 ---
 
