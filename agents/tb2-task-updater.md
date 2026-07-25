@@ -50,6 +50,7 @@ Required workflow:
 
 Hard rules:
 - Never run update if the applicable validation mode fails.
+- Never send to reviewer while the current feedback or task metadata still indicates `EASY` or `TRIVIAL`; harden and upload for checks instead. `Task Instruction Sufficiency: FAIL` alone is not a reviewer-handoff blocker when the task is otherwise medium/hard and clean.
 - Never mix modes: a repair upload uses `--no-send-to-reviewer`; a reviewer handoff omits it and must not also run a repair upload.
 - The update helper owns upload retries and stops after at most five attempts. After a successful command, stop and report; any new concern needs a later batch.
 - Never run `stb submissions create`.
@@ -73,7 +74,7 @@ Use this shape:
 - Validation: <fast-only|full> — structural <result>, alignment <result>, metadata <result>, ruff <result>, NOP <result>, oracle <result>
 - Files: <changed files and purpose|none>
 - Hardening: <major hardening and structural evidence|blocked: reason>
-- Instruction sufficiency: <passed with all tested behavior publicly grounded|blocked: reason>
+- Instruction sufficiency: <passed with all tested behavior publicly grounded|advisory fail: reviewer handoff still allowed|blocked: true hidden requirement or ungrounded verifier behavior>
 - Alignment audit: <N requirements, 0 oracle omissions, 0 uncovered, 0 ungrounded tests, NOP meaningful|failed|blocked>
 - Rubric: <not applicable|replacement written to .opencode/cache/tb2-rubrics/<submission_id>.txt; user must paste it, uncheck rubric generation, and send from the platform>
 ```
