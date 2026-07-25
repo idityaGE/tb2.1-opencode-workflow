@@ -9,4 +9,6 @@ Process every Terminal-Bench 2 submission currently in `NEEDS_REVISION` through 
 
 Additional user constraints: `$ARGUMENTS`
 
+Runtime routing guard: if this command is executed in Kilo Code, the scheduler path is `.kilo/scripts/tb2_update_batch_sdk.sh` even if older context mentions another workflow root.
+
 Follow the `tb2-update-task-orchestrator` agent instructions as the workflow source of truth. Pass constraints and any explicit batch/session reuse request through, then return the agent's final response shape.
