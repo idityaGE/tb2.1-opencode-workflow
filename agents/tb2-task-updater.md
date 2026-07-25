@@ -12,6 +12,7 @@ permission:
     "/tmp/feedback_*": allow
     "/tmp/feedback_*/**": allow
     ".opencode/cache": allow
+    ".opencode/cache/**": allow
   webfetch: allow
   websearch: allow
   skill: allow
