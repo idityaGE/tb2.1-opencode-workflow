@@ -121,6 +121,12 @@ def check_test_docstrings(path: Path) -> None:
                 fail(f"{path}: test function {node.name} is missing a docstring")
 
 
+def check_no_root_ruff_config(task: Path) -> None:
+    for name in ("pyproject.toml", "ruff.toml", ".ruff.toml"):
+        if (task / name).exists():
+            fail(f"{task}: do not add root {name}; fix verifier Ruff findings directly")
+
+
 def canonical_reward_tail_start(lines: list[str]) -> int | None:
     reward_lines = [
         "echo 1 > /logs/verifier/reward.txt",
@@ -423,6 +429,8 @@ def check_milestone_task(task: Path, metadata: dict, config: dict) -> None:
 def check_task(task: Path, *, context: str) -> int:
     print(f"Checking {task}")
     before_failures = FailureCounter.count
+
+    check_no_root_ruff_config(task)
 
     config_path = task / "task.toml"
     if not config_path.exists():
