@@ -24,7 +24,7 @@ Primary opencode files:
 - `.opencode/agents/tb2-workflow-maintainer.md`: modifies workflow infrastructure.
 - `.opencode/skills/tb2-*/SKILL.md`: component workflow guidance.
 - `.opencode/scripts/*`: execution backend scripts for create, validate, submit, and update-only feedback handling.
-- `.opencode/scripts/tb2_sync_kilo_workflow.sh`: regenerates the `.kilo` mirror and intentionally replaces Kilo `/update-task` with a no-SDK handoff so Kilo does not start the opencode batch scheduler.
+- `.opencode/scripts/tb2_sync_kilo_workflow.sh`: regenerates the `.kilo` mirror by rewriting opencode paths/imports to Kilo equivalents; preserve Kilo `/update-task` as the generated `.kilo` scheduler, not a call back into `.opencode`.
 - `.opencode/docs/policy-sources.toml`: copied/local source classification, precedence, upstream path, sync date, and documented overlays.
 - `.opencode/docs/local/**`: local workflow profile and authoring notes.
 - `.opencode/docs/tb2/**`: copied current-status, normative, advisory, and historical TB2 sources.

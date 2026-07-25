@@ -16,7 +16,6 @@ What it does:
   - excludes .opencode/.git and this sync helper from the .kilo copy
   - rewrites copied workflow text from opencode/.opencode to kilo/.kilo
   - switches SDK imports from @opencode-ai/sdk/createOpencode to @kilocode/sdk/createKilo
-  - replaces the batch /update-task command with a Kilo-safe handoff instead of an SDK scheduler
   - normalizes .kilo package metadata to Kilo package names/versions
   - validates the generated Kilo workflow unless --no-validate is supplied
 USAGE
@@ -120,55 +119,6 @@ if package_json.exists():
     deps["@kilocode/sdk"] = package_version("@kilocode/sdk", deps["@kilocode/plugin"])
     package_json.write_text(json.dumps(package, indent=2) + "\n", encoding="utf-8")
 
-(target / "commands" / "update-task.md").write_text("""---
-description: Explain that batch TB2 revision updates must run from opencode, not the Kilo mirror.
-agent: tb2-update-task-orchestrator
----
-
-# /update-task
-
-Kilo Code cannot run the rolling SDK updater scheduler. Do not start `.kilo/scripts/tb2_update_batch_sdk.sh` or any opencode/Kilo SDK server from Kilo.
-
-Additional user constraints: `$ARGUMENTS`
-
-Follow the `tb2-update-task-orchestrator` agent instructions as the workflow source of truth. Return its Kilo-safe handoff response only.
-""", encoding="utf-8")
-
-(target / "agents" / "tb2-update-task-orchestrator.md").write_text("""---
-description: Kilo-safe guard for TB2 batch revision updates, which must run from opencode.
-mode: primary
-permission:
-  read: allow
-  todowrite: allow
-  task: deny
-  bash: deny
-  edit: deny
-color: warning
----
-
-You guard the Kilo Code mirror of the automated Terminal-Bench 2 batch update workflow.
-
-Required workflow:
-1. Do not run `.kilo/scripts/tb2_update_batch_sdk.sh`, `.kilo/scripts/tb2_update_batch_sdk.mjs`, `opencode`, `kilo serve`, or any SDK server from Kilo.
-2. Explain that the rolling batch scheduler is opencode-only because it creates and controls independent updater sessions through the opencode SDK server.
-3. If the user wants the full queue, retry batches, `--pool`, or stop-one-session controls, tell them to run `/update-task` from opencode.
-4. If the user wants to process exactly one submission in Kilo, tell them to run `/update-one-task <submission_id>` instead; do not infer or process an ID from this command.
-5. Do not fetch feedback, list submissions, edit tasks, validate tasks, or run platform update commands from this guard.
-
-Return only:
-```text
-## Update Batch Result
-
-- Status: unavailable in Kilo Code
-- Reason: batch updates require the opencode SDK scheduler; this Kilo mirror intentionally does not start that server.
-- Next step: run `/update-task <flags>` in opencode for batch mode, or `/update-one-task <submission_id>` in Kilo for one submission.
-```
-""", encoding="utf-8")
-
-for obsolete in ("tb2_update_batch_sdk.sh", "tb2_update_batch_sdk.mjs"):
-    path = target / "scripts" / obsolete
-    if path.exists():
-        path.unlink()
 PY
 
 if command -v npm >/dev/null 2>&1 && [ -f "$staging/package.json" ]; then
@@ -184,9 +134,7 @@ rm -rf "$backup"
 backup=""
 
 if [ "$validate" -eq 1 ]; then
-  if [ -f "$target_dir/scripts/tb2_update_batch_sdk.mjs" ]; then
-    node --check "$target_dir/scripts/tb2_update_batch_sdk.mjs"
-  fi
+  node --check "$target_dir/scripts/tb2_update_batch_sdk.mjs"
   bash -n "$target_dir"/scripts/*.sh
   python3 -m py_compile "$target_dir"/scripts/*.py
   if compgen -G "$target_dir/plugins/*.ts" >/dev/null && command -v bun >/dev/null 2>&1; then

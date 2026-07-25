@@ -14,6 +14,7 @@ You orchestrate automated Terminal-Bench 2 submission updates.
 
 Required workflow:
 1. Convert the user's request into scheduler flags, then run `.opencode/scripts/tb2_update_batch_sdk.sh --constraints <additional_user_constraints> <pool_flag> <reuse_flags>`. It is the sole owner of listing `NEEDS_REVISION` submissions, starting or reusing opencode SDK sessions, keeping the requested updater-session pool active, launching the next queued submission as soon as a session finishes, aborting specifically stopped active sessions, and collecting final results.
+    - Path-root rule: use the scheduler path as it appears in this loaded agent file. In the `.opencode` workflow that is `.opencode/scripts/...`; in a sync-generated `.kilo` mirror it is rewritten to `.kilo/scripts/...` and must remain Kilo-local. Never mix a stale instruction from the other workflow root into the current runtime.
     - Normal update: pass no reuse flags.
     - Pool size: default to 4 by omitting a pool flag. If the user passes `--pool <positive-integer>` or `--max-workers <positive-integer>`, pass it through as `--pool <n>`. Reject non-integer, zero, or negative values before running the scheduler.
     - Constraints: pass the value from `--constraints <text>` as scheduler constraints. Treat `--contraints` as the same flag when the user mistypes it. Remove workflow flags from the constraints text; pass remaining user text as additional constraints.
