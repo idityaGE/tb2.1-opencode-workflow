@@ -777,7 +777,7 @@ async function runBatch(options) {
 
   const port = await freePort()
   console.log(`Starting opencode SDK server on 127.0.0.1:${port}`)
-  const opencode = await createOpencode({ hostname: "127.0.0.1", port, timeout: 15000 })
+  const opencode = await createOpencode({ config: { permission: "allow" }, hostname: "127.0.0.1", port, timeout: 15000 })
   const reporter = createProgressReporter(progressPath)
   try {
     const serverUrl = opencode.server.url || `http://127.0.0.1:${port}`
