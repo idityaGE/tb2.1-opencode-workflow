@@ -40,7 +40,7 @@ Required workflow:
 3. Load and follow `tb2-feedback-iterator` from feedback fetch through repair and validation. Include the user's additional constraints in its classification; do not otherwise duplicate or override its classifications.
 4. Follow the skill's deterministic revision-note state check before treating persistent notes as new. Create a replacement rubric without requesting the current platform text when rubric work is required.
 5. Run `.opencode/scripts/tb2_task_state.sh --task tasks/<task_name> --write-cache`. Before editing, send a Markdown table with `Problem`, `Evidence`, `Planned fix`, and `Likely files`; include every concrete reviewer `Revision notes` issue from the feedback helper stdout/stderr even when it is absent from agent-log summaries, then continue automatically.
-6. Load the component skills selected by `tb2-feedback-iterator`, make every classified repair, including any major hardening it authorizes, and run their semantic gates.
+6. Load the component skills selected by `tb2-feedback-iterator`, make every classified repair, including any major hardening it authorizes, and run their semantic gates. For `EASY` or `TRIVIAL`, do not continue to validation until `tb2-hard-task-author`'s revision hardening evidence shows a material agent-visible starting-state change rather than instruction/test/oracle-only expansion.
 7. Run task state again. For `fast-only`, run `.opencode/scripts/tb2_preflight_task.sh --context revision --task tasks/<task_name>`. For `full`, run `.opencode/scripts/tb2_validate_task.sh --context revision --task tasks/<task_name>` until it passes or a concrete blocker remains.
 8. Execute exactly the action selected by the skill:
    - `repair-and-check`: after validation, run `.opencode/scripts/tb2_update_task.sh --task tasks/<task_name> --submission-id <submission_id>`. After success, record the current revision-note hash with the state helper.
@@ -50,6 +50,7 @@ Required workflow:
 
 Hard rules:
 - Never run update if the applicable validation mode fails.
+- Never upload a hardness repair when the revision hardening gate fails or the changed files do not include a material agent-visible `environment/` change.
 - Never send to reviewer while the current feedback or task metadata still indicates `EASY` or `TRIVIAL`; harden and upload for checks instead. `Task Instruction Sufficiency: FAIL` alone is not a reviewer-handoff blocker when the task is otherwise medium/hard and clean.
 - Never mix modes: a repair upload uses `--no-send-to-reviewer`; a reviewer handoff omits it and must not also run a repair upload.
 - The update helper owns upload retries and stops after at most five attempts. After a successful command, stop and report; any new concern needs a later batch.
@@ -57,7 +58,7 @@ Hard rules:
 - Do not modify unrelated tasks or workflow files.
 - Do not reinterpret feedback policy in this agent; report any unresolved classification or repair blocker.
 
-Final response must put the platform outcome and notes first. Use `SUCCESS` only after the selected update-helper mode succeeds, `BLOCKED` for validation, classification, or upload failure, `WAITING` when task resolution is ambiguous, and `MANUAL ACTION` for rubric handoff. Keep the summary concise and combine validation results on one line. Include `Hardening` only when requested or performed, `Instruction sufficiency` and `Alignment audit` when task files were assessed, and `Rubric` only for rubric work.
+Final response must put the platform outcome and notes first. Use `SUCCESS` only after the selected update-helper mode succeeds, `BLOCKED` for validation, classification, semantic-gate, or upload failure, `WAITING` when task resolution is ambiguous, and `MANUAL ACTION` for rubric handoff. A successful hardness checks upload must say that platform difficulty reevaluation is pending; never describe the task as medium or hard before fresh platform results. Keep the summary concise and combine validation results on one line. Include `Hardening` only when requested or performed, `Instruction sufficiency` and `Alignment audit` when task files were assessed, and `Rubric` only for rubric work.
 
 Use this shape:
 ```text
@@ -73,7 +74,7 @@ Use this shape:
 - Changes: <brief concrete problem -> fix summary>
 - Validation: <fast-only|full> — structural <result>, alignment <result>, metadata <result>, ruff <result>, NOP <result>, oracle <result>
 - Files: <changed files and purpose|none>
-- Hardening: <major hardening and structural evidence|blocked: reason>
+- Hardening: <prior pass pattern; agent-visible environment/source delta; independent defect families and interactions; observed successful strategy invalidated; platform difficulty reevaluation pending|blocked: reason>
 - Instruction sufficiency: <passed with all tested behavior publicly grounded|advisory fail: reviewer handoff still allowed|blocked: true hidden requirement or ungrounded verifier behavior>
 - Alignment audit: <N requirements, 0 oracle omissions, 0 uncovered, 0 ungrounded tests, NOP meaningful|failed|blocked>
 - Rubric: <not applicable|replacement written to .opencode/cache/tb2-rubrics/<submission_id>.txt; user must paste it, uncheck rubric generation, and send from the platform>
