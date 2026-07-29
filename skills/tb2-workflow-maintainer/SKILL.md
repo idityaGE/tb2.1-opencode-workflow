@@ -24,7 +24,7 @@ Primary opencode files:
 - `.opencode/agents/tb2-workflow-maintainer.md`: modifies workflow infrastructure.
 - `.opencode/skills/tb2-*/SKILL.md`: component workflow guidance.
 - `.opencode/scripts/*`: execution backend scripts for create, validate, submit, and update-only feedback handling.
-- `.opencode/scripts/tb2_sync_kilo_workflow.sh`: regenerates the `.kilo` mirror by rewriting opencode paths/imports to Kilo equivalents; preserve Kilo `/update-task` as the generated `.kilo` scheduler, not a call back into `.opencode`.
+- `.opencode/scripts/tb2_sync_kilo_workflow.sh`: regenerates the `.kilo` mirror without copying runtime cache data, rewriting opencode paths/imports to Kilo equivalents; preserve Kilo `/update-task` as the generated `.kilo` scheduler, not a call back into `.opencode`.
 - `.opencode/docs/policy-sources.toml`: copied/local source classification, precedence, upstream path, sync date, and documented overlays.
 - `.opencode/docs/local/**`: local workflow profile and authoring notes.
 - `.opencode/docs/tb2/**`: copied current-status, normative, advisory, and historical TB2 sources.
@@ -46,7 +46,7 @@ Update-only feedback scripts:
 - `tb2_quality_report.py`: feedback summary helper.
 - `tb2_list_revisions.sh`: lists only `NEEDS_REVISION` submissions for the configured project without the slow all-folder-name lookup.
 - `tb2_resolve_submission_task.sh`: resolves an update submission to a local task and downloads it into `tasks/` when absent.
-- `tb2_update_state.py`: tracks addressed revision-note hashes and pending rubric handoffs under the ignored workflow cache.
+- `tb2_update_state.py`: tracks addressed revision-note hashes and pending rubric handoffs under the shared repository-root `.tb2-cache`.
 
 ## Flow
 

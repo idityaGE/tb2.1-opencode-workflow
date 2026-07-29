@@ -12,8 +12,8 @@ Usage: tb2_sync_kilo_workflow.sh [--no-validate]
 Rebuild .kilo from the current .opencode workflow mirror.
 
 What it does:
-  - copies .opencode to .kilo, including cache and node_modules
-  - excludes .opencode/.git and this sync helper from the .kilo copy
+  - copies .opencode to .kilo, including node_modules
+  - excludes .opencode/.git, .opencode/cache, and this sync helper from the .kilo copy
   - rewrites copied workflow text from opencode/.opencode to kilo/.kilo
   - switches SDK imports from @opencode-ai/sdk/createOpencode to @kilocode/sdk/createKilo
   - normalizes .kilo package metadata to Kilo package names/versions
@@ -34,6 +34,7 @@ done
 repo_root="$(tb2_repo_root)"
 source_dir="$repo_root/.opencode"
 target_dir="$repo_root/.kilo"
+shared_cache_dir="$repo_root/.tb2-cache"
 
 [ -d "$source_dir" ] || tb2_die "missing source workflow directory: $source_dir"
 command -v python3 >/dev/null 2>&1 || tb2_die "python3 is required"
@@ -43,6 +44,7 @@ command -v mktemp >/dev/null 2>&1 || tb2_die "mktemp is required"
 tmp_parent="$(mktemp -d "$repo_root/.kilo-sync.XXXXXX")"
 staging="$tmp_parent/.kilo"
 backup=""
+mkdir -p "$shared_cache_dir" "$staging"
 
 cleanup() {
   rm -rf "$tmp_parent"
@@ -52,8 +54,14 @@ cleanup() {
 }
 trap cleanup EXIT
 
-cp -a "$source_dir" "$staging"
-rm -rf "$staging/.git"
+shopt -s dotglob nullglob
+for source_entry in "$source_dir"/*; do
+  case "$(basename "$source_entry")" in
+    .git|cache) continue ;;
+  esac
+  cp -a "$source_entry" "$staging/"
+done
+shopt -u dotglob nullglob
 rm -f "$staging/scripts/tb2_sync_kilo_workflow.sh"
 rm -rf "$staging/node_modules/@opencode-ai"
 

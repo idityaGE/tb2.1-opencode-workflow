@@ -8,6 +8,7 @@ import { createOpencode } from "@opencode-ai/sdk"
 const DEFAULT_MAX_WORKERS = 4
 const DEFAULT_POLL_SECONDS = 15
 const DEFAULT_SESSION_TIMEOUT_MINUTES = 360
+const SHARED_CACHE_DIR = ".tb2-cache"
 
 function usage() {
   return `Usage: tb2_update_batch_sdk.mjs --repo-root PATH [--constraints TEXT] [--pool N|--max-workers N] [--poll-seconds N] [--session-timeout-minutes N] [--dry-run] [--reuse-batch BATCH_ID_OR_DIR] [--retry-blocked] [--reuse-session SUBMISSION_ID=SESSION_ID]
@@ -321,7 +322,7 @@ function resolveBatchDir(repoRoot, value) {
   if (value.includes("/")) {
     return path.resolve(repoRoot, value)
   }
-  return path.join(repoRoot, ".opencode/cache/tb2-update-batches", value)
+  return path.join(repoRoot, SHARED_CACHE_DIR, "tb2-update-batches", value)
 }
 
 function emptySessionMap(batchId, sourceBatch = "") {
@@ -755,7 +756,7 @@ async function runBatch(options) {
   }
 
   const batchId = new Date().toISOString().replace(/[:.]/g, "-")
-  const batchDir = path.join(options.repoRoot, ".opencode/cache/tb2-update-batches", batchId)
+  const batchDir = path.join(options.repoRoot, SHARED_CACHE_DIR, "tb2-update-batches", batchId)
   await mkdir(batchDir, { recursive: true })
   const progressPath = path.join(batchDir, "progress.md")
   const eventsPath = path.join(batchDir, "events.log")

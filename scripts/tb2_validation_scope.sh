@@ -30,7 +30,7 @@ repo_root="$(tb2_repo_root)"
 task_path="$(tb2_abs_path "$task")"
 [ -d "$task_path" ] || tb2_die "task directory not found: $task_path"
 task_rel="$(tb2_task_rel_path "$task_path")"
-baseline_file="$repo_root/.opencode/cache/tb2-validation/$(basename "$task_path").runtime.sha256"
+baseline_file="$(tb2_cache_root)/tb2-validation/$(basename "$task_path").runtime.sha256"
 
 cd "$repo_root"
 

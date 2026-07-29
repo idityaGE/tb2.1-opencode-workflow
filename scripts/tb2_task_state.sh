@@ -12,7 +12,7 @@ Usage: tb2_task_state.sh --task TASK_DIR [--write-cache]
 Prints a compact deterministic task state report for agents. The report covers
 git-changed task files, validation scope, runtime baseline presence, key
 task.toml metadata, and instruction word/paragraph counts. With --write-cache,
-also saves the same report under .opencode/cache/tb2-state/.
+also saves the same report under .tb2-cache/tb2-state/.
 EOF
 }
 
@@ -33,8 +33,9 @@ task_path="$(tb2_abs_path "$task")"
 [ -d "$task_path" ] || tb2_die "task directory not found: $task_path"
 task_rel="$(tb2_task_rel_path "$task_path")"
 task_name="$(basename "$task_path")"
-baseline_file="$repo_root/.opencode/cache/tb2-validation/$task_name.runtime.sha256"
-state_cache_file="$repo_root/.opencode/cache/tb2-state/$task_name.txt"
+cache_root="$(tb2_cache_root)"
+baseline_file="$cache_root/tb2-validation/$task_name.runtime.sha256"
+state_cache_file="$cache_root/tb2-state/$task_name.txt"
 
 cd "$repo_root"
 

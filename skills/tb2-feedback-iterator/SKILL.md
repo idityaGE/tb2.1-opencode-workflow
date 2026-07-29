@@ -41,11 +41,11 @@ If rubric and non-rubric issues coexist, choose `repair-and-check`, prepare and 
 
 ## Platform rubric policy
 
-- Do not ask the user for the platform rubric. Read `.opencode/docs/tb2/rubrics.md`, the task contract, verifier, and relevant agent logs, create `.opencode/cache/tb2-rubrics/` if needed, then write a complete replacement to `.opencode/cache/tb2-rubrics/<submission_id>.txt`.
+- Do not ask the user for the platform rubric. Read `.opencode/docs/tb2/rubrics.md`, the task contract, verifier, and relevant agent logs, create `.tb2-cache/tb2-rubrics/` if needed, then write a complete replacement to `.tb2-cache/tb2-rubrics/<submission_id>.txt`.
 - For a regular zero-milestone task, write one flat list without `# Rubric N` blocks. Include at least three distinct negative criteria. Format each line as `Agent …, ±N`, where `N` is 1, 2, 3, or 5 and positive scores include `+`.
 - Keep positive criteria between 10 and 40 points total. Merge or trim overlapping lower-value positives when needed, without dropping reviewer-visible coverage or adding solution hints.
 - Criteria must assess trace-evidenced engineering behavior rather than ordinary pytest execution, final-test outcomes, or reading automatically supplied task files. Make them task-specific and consistent with the copied rubric guidance.
-- Mark the handoff with `python3 .opencode/scripts/tb2_update_state.py mark-rubric --submission-id <submission_id> --rubric-file .opencode/cache/tb2-rubrics/<submission_id>.txt`. If rubric text is the only concrete issue, do not update task files or run `stb submissions update`; tell the user to paste the file, uncheck rubric generation, and send the task from the platform.
+- Mark the handoff with `python3 .opencode/scripts/tb2_update_state.py mark-rubric --submission-id <submission_id> --rubric-file .tb2-cache/tb2-rubrics/<submission_id>.txt`. If rubric text is the only concrete issue, do not update task files or run `stb submissions update`; tell the user to paste the file, uncheck rubric generation, and send the task from the platform.
 
 ## Execution and validation
 

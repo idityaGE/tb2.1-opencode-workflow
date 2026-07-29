@@ -142,7 +142,7 @@ if ! reward_is "$HARBOR_EVAL_MEAN" 1; then
   tb2_die "oracle achieved reward $HARBOR_EVAL_MEAN; expected 1"
 fi
 
-baseline_dir="$repo_root/.opencode/cache/tb2-validation"
+baseline_dir="$(tb2_cache_root)/tb2-validation"
 mkdir -p "$baseline_dir"
 task_rel="$(tb2_task_rel_path "$task_path")"
 baseline_file="$baseline_dir/$(basename "$task_path").runtime.sha256"

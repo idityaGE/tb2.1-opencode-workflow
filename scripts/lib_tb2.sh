@@ -2,6 +2,7 @@
 set -euo pipefail
 
 TB2_PROJECT_ID="bfe79c33-8ab0-4061-9849-08d3207c9927"
+TB2_CACHE_DIR_NAME=".tb2-cache"
 
 tb2_require_ruff() {
   command -v ruff >/dev/null 2>&1 || tb2_die "ruff is required; install it with: uv tool install ruff"
@@ -63,6 +64,13 @@ tb2_repo_root() {
   done
 
   tb2_die "could not find repo root containing docs/cli-user-guide.md and tasks/"
+}
+
+tb2_cache_root() {
+  local cache_root
+  cache_root="$(tb2_repo_root)/$TB2_CACHE_DIR_NAME"
+  mkdir -p "$cache_root"
+  printf '%s\n' "$cache_root"
 }
 
 tb2_abs_path() {

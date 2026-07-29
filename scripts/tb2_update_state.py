@@ -26,7 +26,8 @@ def repo_root() -> Path:
 
 
 def state_path(submission_id: str, state_root: Path | None) -> Path:
-    root = state_root or repo_root() / ".opencode/cache/tb2-updates"
+    root = state_root or repo_root() / ".tb2-cache/tb2-updates"
+    root.mkdir(parents=True, exist_ok=True)
     return root / f"{submission_id}.json"
 
 

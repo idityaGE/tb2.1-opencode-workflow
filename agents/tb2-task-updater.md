@@ -11,8 +11,8 @@ permission:
   external_directory:
     "/tmp/feedback_*": allow
     "/tmp/feedback_*/**": allow
-    ".opencode/cache": allow
-    ".opencode/cache/**": allow
+    ".tb2-cache": allow
+    ".tb2-cache/**": allow
   webfetch: allow
   websearch: allow
   skill: allow
@@ -45,7 +45,7 @@ Required workflow:
 8. Execute exactly the action selected by the skill:
    - `repair-and-check`: after validation, run `.opencode/scripts/tb2_update_task.sh --task tasks/<task_name> --submission-id <submission_id>`. After success, record the current revision-note hash with the state helper.
    - `send-to-reviewer`: after fast preflight of the unchanged task, run the same helper with `--send-to-reviewer`.
-   - `rubric-handoff`: write the complete replacement to `.opencode/cache/tb2-rubrics/<submission_id>.txt`, mark it pending with the state helper, and return without any platform command.
+   - `rubric-handoff`: write the complete replacement to `.tb2-cache/tb2-rubrics/<submission_id>.txt`, mark it pending with the state helper, and return without any platform command.
    - `blocked`: return the evidence without a platform command.
 
 Hard rules:
@@ -77,5 +77,5 @@ Use this shape:
 - Hardening: <prior pass pattern; agent-visible environment/source delta; independent defect families and interactions; observed successful strategy invalidated; platform difficulty reevaluation pending|blocked: reason>
 - Instruction sufficiency: <passed with all tested behavior publicly grounded|advisory fail: reviewer handoff still allowed|blocked: true hidden requirement or ungrounded verifier behavior>
 - Alignment audit: <N requirements, 0 oracle omissions, 0 uncovered, 0 ungrounded tests, NOP meaningful|failed|blocked>
-- Rubric: <not applicable|replacement written to .opencode/cache/tb2-rubrics/<submission_id>.txt; user must paste it, uncheck rubric generation, and send from the platform>
+- Rubric: <not applicable|replacement written to .tb2-cache/tb2-rubrics/<submission_id>.txt; user must paste it, uncheck rubric generation, and send from the platform>
 ```
