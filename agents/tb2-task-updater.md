@@ -11,8 +11,8 @@ permission:
   external_directory:
     "/tmp/feedback_*": allow
     "/tmp/feedback_*/**": allow
-    ".tb2-cache": allow
-    ".tb2-cache/**": allow
+    "*/.tb2-cache": allow
+    "*/.tb2-cache/**": allow
   webfetch: allow
   websearch: allow
   skill: allow
