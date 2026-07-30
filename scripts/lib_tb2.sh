@@ -16,11 +16,50 @@ tb2_run_platform_ruff() {
 
 tb2_run_advisory_ruff() {
   local task_path="$1"
+  local report_dir report_file temp_report task_name ruff_rc summary
   tb2_require_ruff
   printf 'Advisory Ruff command (non-blocking): ruff check --select I,UP,PLW,ISC,E,Q,C,RUF100\n'
-  if ! ruff check --select I,UP,PLW,ISC,E,Q,C,RUF100 "$task_path"; then
-    printf 'Advisory Ruff family findings reported; validation continues. Do not rewrite task semantics, NOP behavior, or oracle behavior just to satisfy advisory style findings.\n'
+  report_dir="$(tb2_cache_root)/tb2-validation/advisory-ruff"
+  mkdir -p "$report_dir"
+  task_name="$(basename "$task_path")"
+  report_file="$report_dir/$task_name.log"
+  temp_report="$(mktemp "$report_dir/.$task_name.XXXXXX")"
+  if ruff check --select I,UP,PLW,ISC,E,Q,C,RUF100 "$task_path" >"$temp_report" 2>&1; then
+    rm -f "$temp_report" "$report_file"
+    printf 'Advisory Ruff: 0 findings.\n'
+    return 0
+  else
+    ruff_rc=$?
   fi
+  mv "$temp_report" "$report_file"
+  summary="$(python3 - "$report_file" <<'PY'
+from __future__ import annotations
+
+import collections
+import re
+import sys
+
+counts: collections.Counter[str] = collections.Counter()
+with open(sys.argv[1], encoding="utf-8", errors="replace") as handle:
+    for line in handle:
+        match = re.match(r"^([A-Z]+\d+)\b", line)
+        if match:
+            counts[match.group(1)] += 1
+
+total = sum(counts.values())
+ordered = sorted(counts.items(), key=lambda item: (-item[1], item[0]))
+shown = ordered[:8]
+parts = [f"{code}={count}" for code, count in shown]
+if len(ordered) > len(shown):
+    parts.append(f"other={sum(count for _, count in ordered[len(shown):])}")
+print(f"{total}\t{', '.join(parts) if parts else 'unclassified'}")
+PY
+)"
+  printf 'Advisory Ruff: %s findings (%s); non-blocking. Full report: %s\n' "${summary%%$'\t'*}" "${summary#*$'\t'}" "$report_file"
+  if [ "$ruff_rc" -ne 1 ]; then
+    printf 'warning: advisory Ruff exited with status %s; validation continues because this pass is non-blocking.\n' "$ruff_rc" >&2
+  fi
+  printf 'Do not rewrite task semantics, NOP behavior, or oracle behavior solely to satisfy advisory findings.\n'
 }
 
 tb2_random_time_minutes() {

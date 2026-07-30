@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import importlib.util
+import io
 import json
 import tempfile
 import unittest
@@ -346,6 +348,52 @@ class HistoryTests(unittest.TestCase):
             evidence_file=evidence_file,
         )
         self.assertEqual(state.record_hardening(args), 0)
+
+    def test_hardening_gate_rejects_string_source_delta_concisely(self):
+        self.record(feedback_text())
+        evidence_file = self.root / "hardening-invalid.json"
+        evidence_file.write_text(
+            json.dumps(
+                {
+                    "prior_difficulty": "EASY",
+                    "prior_agent_performance": {},
+                    "successful_trace_sources": [],
+                    "common_success_strategy": "patched one local branch",
+                    "prior_failed_hardening": [],
+                    "starting_state_files_changed": ["environment/main.c"],
+                    "defect_families": [
+                        {
+                            "name": "replay ordering",
+                            "root_cause": "state advances too early",
+                            "source_delta": "environment/main.c",
+                            "interacts_with": ["recovery"],
+                            "strategy_invalidated": "local patch",
+                            "oracle_signal": "oracle repairs ordering",
+                            "verifier_signal": "restart test checks state",
+                        }
+                    ],
+                    "contract_changes": [],
+                    "removed_or_replaced_shallow_complexity": [],
+                }
+            ),
+            encoding="utf-8",
+        )
+        args = argparse.Namespace(
+            submission_id=SUBMISSION,
+            state_root=self.state_root,
+            task=self.task,
+            evidence_file=evidence_file,
+        )
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            self.assertEqual(state.record_hardening(args), 1)
+        result = json.loads(output.getvalue())
+        self.assertEqual(
+            result["errors"],
+            [
+                "defect_families[0].source_delta must be an array of non-empty strings"
+            ],
+        )
 
 
 class FingerprintTests(unittest.TestCase):

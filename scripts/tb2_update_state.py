@@ -567,6 +567,89 @@ def record_feedback(args: argparse.Namespace) -> int:
     return 0
 
 
+def hardening_failure(path: Path, state: dict, iteration: dict, errors: list[str]) -> int:
+    iteration["hardening_gate"] = "failed"
+    iteration["hardening_gate_errors"] = errors
+    iteration["platform_result"] = "BLOCKED"
+    save_state(path, state)
+    print(json.dumps({"hardening_gate": "failed", "errors": errors}, sort_keys=True))
+    return 1
+
+
+def is_string_list(value: object) -> bool:
+    return isinstance(value, list) and all(
+        isinstance(item, str) and bool(item.strip()) for item in value
+    )
+
+
+def hardening_shape_errors(evidence: object) -> list[str]:
+    if not isinstance(evidence, dict):
+        return ["hardening evidence root must be a JSON object"]
+
+    expected_types = {
+        "prior_difficulty": "string",
+        "prior_agent_performance": "object",
+        "successful_trace_sources": "array of strings",
+        "common_success_strategy": "string",
+        "prior_failed_hardening": "array of strings",
+        "starting_state_files_changed": "array of strings",
+        "defect_families": "array of objects",
+        "contract_changes": "array of strings",
+        "removed_or_replaced_shallow_complexity": "array of strings",
+    }
+    errors: list[str] = []
+    for field, expected in expected_types.items():
+        if field not in evidence:
+            errors.append(f"{field} is required ({expected})")
+
+    if "prior_difficulty" in evidence and not isinstance(
+        evidence["prior_difficulty"], str
+    ):
+        errors.append("prior_difficulty must be a string")
+    if "prior_agent_performance" in evidence and not isinstance(
+        evidence["prior_agent_performance"], dict
+    ):
+        errors.append("prior_agent_performance must be an object")
+    if "common_success_strategy" in evidence and not isinstance(
+        evidence["common_success_strategy"], str
+    ):
+        errors.append("common_success_strategy must be a string")
+    for field in (
+        "successful_trace_sources",
+        "prior_failed_hardening",
+        "starting_state_files_changed",
+        "contract_changes",
+        "removed_or_replaced_shallow_complexity",
+    ):
+        if field in evidence and not is_string_list(evidence[field]):
+            errors.append(f"{field} must be an array of non-empty strings")
+
+    families = evidence.get("defect_families")
+    if "defect_families" in evidence and not isinstance(families, list):
+        errors.append("defect_families must be an array of objects")
+        return errors
+    for index, family in enumerate(families or [], start=1):
+        prefix = f"defect_families[{index - 1}]"
+        if not isinstance(family, dict):
+            errors.append(f"{prefix} must be an object")
+            continue
+        for field in (
+            "name",
+            "root_cause",
+            "strategy_invalidated",
+            "oracle_signal",
+            "verifier_signal",
+        ):
+            if field in family and not isinstance(family[field], str):
+                errors.append(f"{prefix}.{field} must be a string")
+        for field in ("source_delta", "interacts_with"):
+            if field in family and not is_string_list(family[field]):
+                errors.append(
+                    f"{prefix}.{field} must be an array of non-empty strings"
+                )
+    return errors
+
+
 def record_hardening(args: argparse.Namespace) -> int:
     path = state_path(args.submission_id, args.state_root)
     state = load_state(path, args.submission_id)
@@ -577,21 +660,15 @@ def record_hardening(args: argparse.Namespace) -> int:
     ):
         raise SystemExit("error: no current platform low-difficulty result exists")
     evidence_path = args.evidence_file.resolve()
-    evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
-    errors: list[str] = []
-    required_fields = {
-        "prior_difficulty",
-        "prior_agent_performance",
-        "successful_trace_sources",
-        "common_success_strategy",
-        "prior_failed_hardening",
-        "starting_state_files_changed",
-        "defect_families",
-        "contract_changes",
-        "removed_or_replaced_shallow_complexity",
-    }
-    for field in sorted(required_fields - evidence.keys()):
-        errors.append(f"required hardening field is missing: {field}")
+    try:
+        evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        return hardening_failure(
+            path, state, iteration, [f"could not read hardening evidence: {error}"]
+        )
+    errors = hardening_shape_errors(evidence)
+    if errors:
+        return hardening_failure(path, state, iteration, errors)
     task = args.task.resolve()
     current_fingerprint = task_fingerprint(task)
     current_manifest = task_manifest(task)
@@ -675,14 +752,7 @@ def record_hardening(args: argparse.Namespace) -> int:
             "structural redesign does not identify replaced shallow complexity"
         )
     if errors:
-        iteration["hardening_gate"] = "failed"
-        iteration["hardening_gate_errors"] = errors
-        iteration["platform_result"] = "BLOCKED"
-        save_state(path, state)
-        print(
-            json.dumps({"hardening_gate": "failed", "errors": errors}, sort_keys=True)
-        )
-        return 1
+        return hardening_failure(path, state, iteration, errors)
     iteration["observed_success_strategy"] = evidence["common_success_strategy"]
     iteration["failed_prior_strategies"] = evidence.get("prior_failed_hardening", [])
     iteration["hardening_evidence_file"] = str(evidence_path)
