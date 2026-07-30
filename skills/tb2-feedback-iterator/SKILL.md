@@ -1,58 +1,105 @@
 ---
 name: tb2-feedback-iterator
-description: Classify Terminal-Bench 2 feedback, repair and recheck failures, send clean tasks to review, or prepare a manual rubric handoff.
+description: Classify Terminal-Bench 2 feedback, persist update history, repair and recheck failures, send clean tasks to review, or prepare a manual rubric handoff.
 ---
 
 # TB2 Feedback Iterator
 
-Use for each submission delegated by the automated `/update-task` batch.
+Use for each submission delegated by `/update-task` or `/update-one-task`. This skill owns update classification and repair policy. The updater must perform the complete flow itself; do not invoke a separate reviewer or run local Claude/OpenAI/frontier difficulty evaluations.
 
-## Classification policy
+## Authoritative state machine
 
-- Fetch with `.opencode/scripts/tb2_status_iterate.sh --submission-id <submission_id>`. Inspect its full stdout/stderr as feedback evidence, especially any `Revision notes` section, then inspect the `Feedback directory:` if one is printed before classifying anything.
-- In the feedback directory, read `notes.txt` first, then `agent_review.txt` when present, then focused evidence in `agent_logs/summary-of-runs-comment.md` and `agent_logs/jobs/**`. For an oracle failure, inspect the oracle job `result.json`, verifier outputs, and job logs instead of guessing from the summary.
-- Treat concrete reviewer notes, including stdout/stderr `Revision notes`, quality/CI/LLMaJ findings, downloaded artifacts, rubric findings, and NOP/oracle or agent-run evidence as actionable. `Task Instruction Sufficiency: FAIL` by itself is advisory for update routing, not a blocker for reviewer handoff.
-- Ignore `AutoEval Execution Summary: AutoEval execution failed...` lines in `Revision Notes`; they are not reviewer instructions. Still investigate independent oracle, quality, build, or test failures elsewhere in the feedback.
-- Ignore category-change warnings unless the user explicitly asks to change category. The revision profile preserves valid grandfathered category, language, difficulty, and milestone metadata.
-- Treat the task's `easy` metadata, concrete easy/trivial platform feedback, or an explicit user request to harden an easy/trivial task as an actionable hardness finding. User-requested hardening does not require a matching reviewer note. For platform `EASY` or `TRIVIAL`, inspect available successful and near-success agent summaries or traces; the pass pattern is repair evidence, not just a score.
-- Run `python3 .opencode/scripts/tb2_update_state.py inspect --submission-id <submission_id> --notes-file <feedback_dir>/notes.txt` before classifying revision notes. A `new` concrete note is actionable. An `addressed` note is persistent platform text from a prior successful checks upload and must not be repaired again unless current evidence shows the fix regressed. This cache-backed hash applies only to revision-note text; it never makes current quality, oracle, or agent-run evidence stale.
-- Classify every actionable item before editing and summarize the evidence. Every new concrete issue from reviewer `Revision notes` must appear in the pre-edit `Problem` table even if agent-log summaries or downloaded files do not repeat it. Do not hide an issue that cannot be repaired.
+### A. Fetch and record complete feedback
 
-## Platform action decision
+1. Run `.opencode/scripts/tb2_status_iterate.sh --submission-id <submission_id>` and preserve its stdout/stderr.
+2. In the reported feedback directory read, in order: `notes.txt`; `agent_review.txt` when present; `agent_logs/summary-of-runs-comment.md`; focused `agent_logs/jobs/**` evidence when an oracle, verifier, build, or named-test result needs confirmation. Inspect iteration history with `python3 .opencode/scripts/tb2_update_state.py inspect --submission-id <submission_id>`.
+3. Record the fetched facts before editing:
+   ```text
+   python3 .opencode/scripts/tb2_update_state.py record-feedback \
+     --submission-id <submission_id> --feedback-dir <feedback_dir> --task tasks/<task_name>
+   ```
+   Pass scheduler batch/session provenance when available. Use its mechanical difficulty, solvability, pass-count, quality, normalized-note, fingerprint, completeness, hardening-level, and cycle-aware note-status output as facts, not as repair classification.
 
-Choose exactly one action after reading all evidence:
+### B. Remove platform noise
 
-- `repair-and-check` when any of these is present: `TRIVIAL` or `EASY`; an explicit failed-difficulty message; a non-solvable status; any named unit test passed by zero agent runs; oracle failure; any failed quality check other than `Task Instruction Sufficiency` or `not_applicable`; or a new actionable reviewer note. A `0 / N` unit-test result is non-solvable repair evidence even when the platform describes the task as possibly super hard. Zero fully successful agent runs alone is not equivalent when every individual test passed in at least one run. Repair all supported issues, validate, and upload with `--no-send-to-reviewer`.
-- `send-to-reviewer` only when difficulty is `MEDIUM` or `HARD`, status is solvable or at least one agent run passed all tests, every quality check passes or is `not_applicable` except that `Task Instruction Sufficiency: FAIL` may remain, no new reviewer note remains, and no rubric handoff is pending. Addressed revision notes from the state helper are not new issues; do not repair or upload the task for checks again just because those persistent notes still appear in the platform text. Never send a task to reviewer while the latest platform feedback, task metadata, or current evidence says `TRIVIAL` or `EASY`. A top-level `WARNING` in `agent_review.txt` also does not block reviewer handoff when the report contains no failing issue; warnings and suggestions alone do not require edits.
-- `rubric-handoff` only when rubric correction is the sole remaining issue: difficulty is `MEDIUM` or `HARD`, solvability evidence is green, non-rubric quality checks pass except the allowed instruction-sufficiency advisory, and no actionable non-rubric issue remains. `rubric_pending=true` does not override a non-solvable result, a current failed check, or another actionable issue. Do not run the update helper; return the replacement-rubric path for manual platform paste and submission.
-- `blocked` when evidence is incomplete or required repair/validation cannot pass. Never infer a green state from missing sections.
+The revision-note line `AutoEval Execution Summary: AutoEval execution failed. Build status: FAILED...` is platform noise. Every exact line with that AutoEval failure prefix is excluded from normalized notes and their hash. It must never appear in the Problem table, trigger a repair or Docker/build change, or influence routing. Independent oracle/verifier failures, static-check failures, and concrete build logs outside that line remain actionable.
 
-If rubric and non-rubric issues coexist, choose `repair-and-check`, prepare and mark the rubric replacement during that run, and upload the task for checks. On a later batch, persistent addressed notes are ignored, but `rubric_pending=true` forces `rubric-handoff` instead of automatic reviewer submission only after fresh non-rubric evidence is green.
+Category-change warnings remain non-actionable unless the user asks for a category change. Preserve valid grandfathered category, language, difficulty, and milestone metadata during revision.
 
-## Repair policy
+### C. Require current, complete evidence
 
-- For ordinary feedback repair, fix only issues supported by feedback. A hardness finding explicitly authorizes major, core-preserving changes beyond the listed reviewer defects, including adding more bugs/failure modes when the current task is too easy.
-- For a hardness finding, make honest hard difficulty the primary repair goal. Apply the private blueprint and revision hardening gate in `tb2-hard-task-author`; do not stop after superficial complexity, wording changes, fixing only the reviewer-listed files, or adding tests and oracle behavior without changing the agent-visible starting state. Add, replace, or deepen interacting hidden failure layers, runtime behavior, environment code, oracle logic, and behavioral verifier coverage as needed. Preserve the task's domain and objective where they remain viable, but do not preserve an easy implementation shape merely to minimize the diff.
-- During hardening, treat instruction sufficiency as a fairness and best-effort cleanup goal, not a co-equal blocker. Added observable behavior should be stated neutrally in `instruction.md` or an explicitly referenced approved contract, while hidden defects, repair steps, and test-shaped hints remain undisclosed. If good-faith neutral wording still leaves a platform instruction-sufficiency failure, continue with the hardness repair path; an easy/trivial result blocks reviewer handoff, instruction sufficiency alone does not. Re-run the `tb2-tests` four-way audit after all contract, runtime, oracle, or verifier changes, and fix any truly ungrounded verifier behavior or hidden requirement found by that audit.
-- For instruction sufficiency, state the missing observable requirement neutrally. If that clarification would expose the seeded repair, remove hint-like wording and deepen the implementation/verifier with another contract-grounded hidden interaction before validation.
-- Do not weaken tests unless they are unfair, flaky, outside the public contract, or contradicted by platform feedback.
-- Load `tb2-instruction` for prompt changes, `tb2-tests` for any public-contract/oracle/verifier change, `tb2-solution` for oracle changes, and `tb2-hard-task-author` for task-shape or environment-contract changes. The four-way audit is defined only in `tb2-tests`; invoke it rather than restating it here.
-- If `tests/test.sh` changes on a regular task, restore it from `.opencode/templates/tests/test.sh`. Preserve the task-specific pytest path for grandfathered milestone revisions.
+- Return `WAITING` without edits or upload when feedback has only ignored AutoEval text, lacks either a complete current difficulty/solvability/named-test/quality evaluation or concrete reviewer revision notes, or is still inside the cooldown with the same evaluation fingerprint as the latest checks upload.
+- Do not upload pre-existing local changes, mark notes addressed, mutate the task, or infer that evaluation finished when feedback is incomplete or unrefreshed. If local provenance is ambiguous, return `WAITING` before editing or `BLOCKED` if safe attribution cannot be recovered.
+- If the ledger contains an open/`UNKNOWN` platform attempt, fetch current platform state and reconcile it before any new upload. Never blindly retry an interrupted mutation.
 
-## Platform rubric policy
+### D. Choose exactly one action
 
-- Do not ask the user for the platform rubric. Read `.opencode/docs/tb2/rubrics.md`, the task contract, verifier, and relevant agent logs, create `.tb2-cache/tb2-rubrics/` if needed, then write a complete replacement to `.tb2-cache/tb2-rubrics/<submission_id>.txt`.
-- For a regular zero-milestone task, write one flat list without `# Rubric N` blocks. Include at least three distinct negative criteria. Format each line as `Agent …, ±N`, where `N` is 1, 2, 3, or 5 and positive scores include `+`.
-- Keep positive criteria between 10 and 40 points total. Merge or trim overlapping lower-value positives when needed, without dropping reviewer-visible coverage or adding solution hints.
-- Criteria must assess trace-evidenced engineering behavior rather than ordinary pytest execution, final-test outcomes, or reading automatically supplied task files. Make them task-specific and consistent with the copied rubric guidance.
-- Mark the handoff with `python3 .opencode/scripts/tb2_update_state.py mark-rubric --submission-id <submission_id> --rubric-file .tb2-cache/tb2-rubrics/<submission_id>.txt`. If rubric text is the only concrete issue, do not update task files or run `stb submissions update`; tell the user to paste the file, uncheck rubric generation, and send the task from the platform.
+#### `repair-and-check`
 
-## Execution and validation
+Choose this action when any applies:
+- `EASY` or `TRIVIAL`, or an explicit difficulty failure;
+- non-solvable status;
+- any named test at `0 / N` (zero complete agent runs alone is not equivalent if every named test passed at least once);
+- oracle failure;
+- any quality failure other than `Task Instruction Sufficiency` or `not_applicable`;
+- a new or reopened reviewer note in the current reviewer cycle;
+- a concrete rubric defect combined with another actionable issue.
 
-- Use the task path returned by `.opencode/scripts/tb2_resolve_submission_task.sh`; the updater runs this first so a missing local task is downloaded into `tasks/`. If the helper reports ambiguous local candidates, return them to the parent as `WAITING` rather than asking from the subagent. Run `.opencode/scripts/tb2_task_state.sh --task tasks/<task_name> --write-cache` before and after edits.
-- Follow `.opencode/docs/local/workflow-profile.md`. For `fast-only`, run `.opencode/scripts/tb2_preflight_task.sh --context revision --task tasks/<task_name>` and perform the semantic checks owned by the loaded component skills. For `full`, run `.opencode/scripts/tb2_validate_task.sh --context revision --task tasks/<task_name>` until it passes or a concrete blocker remains.
-- Never run local frontier/real-agent evaluations, including `stb harbor run -m ...`, during this workflow. NOP and oracle runs required by full validation remain allowed. Report hardening from task-shape and contract evidence without claiming an empirically measured pass rate.
-- For `repair-and-check`, run `.opencode/scripts/tb2_update_task.sh --task tasks/<task_name> --submission-id <submission_id>` only after applicable validation passes and, for a hardness finding, the `tb2-hard-task-author` revision hardening gate passes. After success, record addressed notes with `python3 .opencode/scripts/tb2_update_state.py record-notes --submission-id <submission_id> --notes-file <feedback_dir>/notes.txt --upload-mode checks --task tasks/<task_name>`. A successful checks upload means only that the revised files were accepted for reevaluation; difficulty remains pending until fresh frontier-agent results arrive.
-- For `send-to-reviewer`, make no feedback-driven edits, run fast preflight, then add `--send-to-reviewer` to the update helper. Never follow it with a checks upload.
-- The update helper retries transient `stb submissions update` failures at most five times in one mode. It does not retry or count a platform static-check rejection. When it reports `update_static_checks=failed`, treat the full platform output as repair evidence, fix every reported task issue, rerun applicable validation, and invoke the helper again; never resubmit unchanged files. Continue until checks pass or a concrete blocker remains. If upload prep changes files, validate again before invoking the helper.
-- Never update after failed validation, never run both platform modes for one fetched result, and never run `stb submissions create` from this workflow.
+Repair every supported issue, run applicable local validation, record that validation, and upload in checks mode. The final result is `CHECKS SUBMITTED`, meaning only that platform reevaluation is pending. Never call the task fixed.
+
+#### `send-to-reviewer`
+
+Choose only when the latest complete platform evidence says all of the following:
+- difficulty is `MEDIUM` or `HARD`;
+- status is solvable;
+- every named test passed in at least one run;
+- every quality check passes or is `not_applicable`, except `Task Instruction Sufficiency: FAIL` may be the sole quality exception;
+- no actionable reviewer note remains in the current cycle;
+- no rubric handoff is pending.
+
+Make no feedback-driven task edit, run unchanged-task fast preflight, record validation, and upload in reviewer mode. The final result is `SENT TO REVIEWER`. Sending increments `reviewer_cycle`; identical reviewer text returned in that new cycle is actionable again.
+
+#### `rubric-handoff`
+
+Choose only when every non-rubric platform check is green and rubric work is the sole remaining action. Write the complete replacement to `.tb2-cache/tb2-rubrics/<submission_id>.txt`, run `mark-rubric`, do not upload, and return `MANUAL ACTION`.
+
+#### Waiting, blocked, or unknown
+
+- `WAITING`: feedback is incomplete or unrefreshed.
+- `BLOCKED`: a supported repair cannot be completed, hardening evidence fails, applicable validation fails, or upload definitively fails.
+- `UNKNOWN`: a mutating platform call was interrupted and may have reached the platform.
+
+## Reviewer-note cycles and history
+
+- A normalized reviewer-note hash is stale only when it was addressed in the current `reviewer_cycle`. Difficulty, solvability, named-test, oracle, and quality evidence are never suppressed by a note hash.
+- A checks upload records the current note hash with its cycle, task fingerprint, and submission time. A reviewer upload starts a new cycle. The same note in that later cycle is a reopened defect.
+- The ledger at `.tb2-cache/tb2-updates/<submission_id>.json` is authoritative for observations, fingerprints, hardening escalation, validation, attempts, and outcomes. All helper writes are atomic.
+- `migrate-batches --batch-root .tb2-cache/tb2-update-batches` imports legacy scheduler results without rewriting historical logs; it is safe to rerun.
+
+## Repair and hardening
+
+- Ordinary repairs stay tied to concrete feedback. A hardness finding authorizes major core-preserving redesign.
+- For `EASY` or `TRIVIAL`, load `tb2-hard-task-author`, inspect available successful/near-success evidence, and follow its history-aware hardening rules. Write private evidence to `.tb2-cache/tb2-hardening/<submission_id>/<iteration>.json`, then run `record-hardening --submission-id ... --task ... --evidence-file ...`. Do not validate or upload until that mechanical gate passes.
+- First `EASY`: invalidate the common successful strategy through an agent-visible runtime/source change and an orthogonal non-local defect family. First `TRIVIAL`: structurally redesign the starter failure topology.
+- Repeated low difficulty marks the prior strategy empirically failed. Do not repeat additive fields, hashes, checkpoints, isolated validation rules, or instruction/test/oracle-only expansion. Restructure core agent-visible implementation and use multiple interacting root-cause families. There is no arbitrary platform-iteration cap, but block any iteration that cannot provide supported hardening evidence.
+- Load `tb2-instruction` for prompt edits, `tb2-tests` for any contract/oracle/verifier change, `tb2-solution` for oracle edits, and `tb2-hard-task-author` for task-shape/runtime changes. The four-way audit remains defined only in `tb2-tests`.
+- If `tests/test.sh` changes on a regular task, restore it from `.opencode/templates/tests/test.sh`. Do not weaken fair tests merely to improve agent scores.
+
+## Hardening evidence contract
+
+The private JSON must include: `prior_difficulty`, `prior_agent_performance`, `successful_trace_sources`, `common_success_strategy`, `prior_failed_hardening`, `starting_state_files_changed`, `defect_families`, `contract_changes`, and `removed_or_replaced_shallow_complexity`. Each defect family records `name`, `root_cause`, `source_delta`, `interacts_with`, `strategy_invalidated`, `oracle_signal`, and `verifier_signal`.
+
+The state helper gate verifies current low feedback, available trace inspection, a real changed agent-visible source path, increasing escalation on repeated lows, a fingerprint different from the last checks upload, no instruction/test/oracle-only self-certification, existing claimed paths, oracle/verifier signals, and acknowledgement of failed prior strategies. It prevents unsupported claims but does not claim semantic difficulty.
+
+## Rubric policy
+
+- Do not ask the user for existing platform rubric text. Use `.opencode/docs/tb2/rubrics.md`, the task contract/verifier, and relevant traces to create a complete replacement.
+- Regular zero-milestone tasks use one flat list with at least three distinct negative `Agent …, -N` criteria. Positive criteria total 10–40 points. Assess task-specific trace behavior, not ordinary pytest execution or supplied-file reading.
+- If rubric and non-rubric issues coexist, prepare and mark the rubric during `repair-and-check`; only return `rubric-handoff` after fresh non-rubric evidence is green.
+
+## Validation and upload
+
+- Run `tb2_task_state.sh --write-cache` before and after edits. Use `tb2_preflight_task.sh --context revision` only for genuine `fast-only` changes; runtime-affecting work uses `tb2_validate_task.sh --context revision` with structural, mandatory Ruff, NOP, and oracle checks.
+- Broad Ruff selectors remain advisory and separate from mandatory Ruff status. Local validation may claim structural validity, contract alignment, mandatory Ruff status, NOP result, and oracle result only. Say: `Local validation passed; platform difficulty and quality reevaluation pending.` Never claim local difficulty, empirical frontier-strategy invalidation, platform quality, or that the task is fixed.
+- Record validation with `record-validation` before either upload mode. Run `.opencode/scripts/tb2_update_task.sh --task ... --submission-id ...` for checks or add `--send-to-reviewer` for reviewer mode. The helper owns fingerprints, an atomic begin/finish ledger entry for every invocation, cumulative iteration attempts, five transient retries per invocation, static/definitive failure records, and interruption-to-`UNKNOWN` handling.
+- Never run both upload modes for one fetched result, upload after failed validation, run `stb submissions create`, or invoke another reviewer agent.

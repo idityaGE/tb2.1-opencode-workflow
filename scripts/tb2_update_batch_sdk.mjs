@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import { spawnSync } from "node:child_process"
 import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises"
+import assert from "node:assert/strict"
 import net from "node:net"
 import path from "node:path"
 import { createOpencode } from "@opencode-ai/sdk"
@@ -9,6 +10,7 @@ const DEFAULT_MAX_WORKERS = 4
 const DEFAULT_POLL_SECONDS = 15
 const DEFAULT_SESSION_TIMEOUT_MINUTES = 360
 const SHARED_CACHE_DIR = ".tb2-cache"
+const RESULT_PATTERN = "CHECKS SUBMITTED|SENT TO REVIEWER|MANUAL ACTION|WAITING|BLOCKED|UNKNOWN"
 
 function usage() {
   return `Usage: tb2_update_batch_sdk.mjs --repo-root PATH [--constraints TEXT] [--pool N|--max-workers N] [--poll-seconds N] [--session-timeout-minutes N] [--dry-run] [--reuse-batch BATCH_ID_OR_DIR] [--retry-blocked] [--reuse-session SUBMISSION_ID=SESSION_ID]
@@ -120,9 +122,36 @@ function parseRevisionRows(tsv) {
   })
 }
 
+function compactHistory(history) {
+  const iterations = Array.isArray(history?.iterations) ? history.iterations : []
+  const last = iterations.at(-1) || {}
+  const lastPlatform = [...iterations].reverse().find((item) => item.platform_result) || {}
+  const lowUploads = iterations.filter(
+    (item) => ["EASY", "TRIVIAL"].includes(item?.feedback?.difficulty) && item.platform_result === "CHECKS SUBMITTED",
+  )
+  const failed = [...iterations]
+    .reverse()
+    .flatMap((item) => item.failed_prior_strategies || [])
+    .find(Boolean) || "none"
+  const difficulty = last?.feedback?.difficulty || "unknown"
+  const level = ["EASY", "TRIVIAL"].includes(difficulty) ? lowUploads.length + (last.platform_result === "CHECKS SUBMITTED" ? 0 : 1) : 0
+  const escalation = difficulty === "TRIVIAL" || level > 1 ? "structural-redesign" : difficulty === "EASY" ? "orthogonal-non-local-defect" : "none"
+  return [
+    `Prior iterations: ${iterations.length}`,
+    `Last platform difficulty: ${difficulty}`,
+    `Prior hardness uploads: ${lowUploads.length}`,
+    `Last failed hardening: ${failed}`,
+    `Last task fingerprint: ${last.task_fingerprint_after || last.prior_task_fingerprint || "unknown"}`,
+    `Pending rubric: ${Boolean(history?.rubric_pending)}`,
+    `Last platform action: ${last.platform_reconciled ? "UNKNOWN (reconciled)" : lastPlatform.platform_result || "none"}`,
+    `Required escalation level: ${escalation}`,
+  ].join("\n")
+}
+
 function promptFor(row, constraints) {
   const folder = row.folderName.trim() || "<blank>"
   const userConstraints = constraints.trim() || "None"
+  const historyBlock = compactHistory(row.history)
   if (row.reuseSessionId) {
     const previousResult = row.previousResult || "unknown"
     const previousNotes = row.previousNotes || "None"
@@ -134,6 +163,9 @@ Previous result: ${previousResult}
 Previous notes: ${previousNotes}
 Additional user constraints: ${userConstraints}
 
+Update history:
+${historyBlock}
+
 Reuse this session's existing context. Focus on the user's requested retry or repair, rerun the applicable validation, then execute exactly one selected update mode if validation passes. Do not ask the user from this child session, do not call the question tool, and do not wait for clarification; return WAITING, MANUAL ACTION, or BLOCKED when user input would be required. Return the required final response shape.`
   }
   return `Update exactly one Terminal-Bench 2 revision submission.
@@ -141,6 +173,9 @@ Reuse this session's existing context. Focus on the user's requested retry or re
 Submission ID: ${row.submissionId}
 Displayed folder name: ${folder}
 Additional user constraints: ${userConstraints}
+
+Update history:
+${historyBlock}
 
 Follow the tb2-task-updater agent instructions as the workflow source of truth. Do not ask the user from this child session, do not call the question tool, and do not wait for clarification; return WAITING, MANUAL ACTION, or BLOCKED when user input would be required. Resolve/download the local task, fetch feedback, choose exactly one owned action, run applicable validation before any update mode, and return the required final response shape.`
 }
@@ -246,7 +281,7 @@ function deriveProgressFromText(text, fallbackStatus, fallbackEvent) {
   const lastLine = lines.at(-1) || fallbackEvent
 
   let status = fallbackStatus
-  if (/update result:\s*(success|blocked|waiting|manual action)/i.test(text)) {
+  if (new RegExp(`update result:\\s*(${RESULT_PATTERN})`, "i").test(text)) {
     status = "finishing"
   } else if (joined.includes("tb2_update_task.sh") || joined.includes("stb submissions update")) {
     status = "updating platform"
@@ -281,7 +316,7 @@ async function refreshWorkerProgress(client, repoRoot, worker) {
     const progress = deriveProgressFromText(text, worker.status, worker.lastEvent)
     worker.status = progress.status
     worker.lastEvent = progress.lastEvent
-    return /##\s+Update Result:\s*(SUCCESS|BLOCKED|WAITING|MANUAL ACTION)/i.test(text)
+    return new RegExp(`##\\s+Update Result:\\s*(${RESULT_PATTERN})`, "i").test(text)
   } catch (error) {
     worker.lastEvent = compactEvent(`progress read failed: ${error instanceof Error ? error.message : String(error)}`)
     return false
@@ -341,6 +376,31 @@ async function loadSessionMap(filePath) {
     throw new Error(`invalid sessions map: ${filePath}`)
   }
   return parsed
+}
+
+async function loadSubmissionHistory(repoRoot, submissionId) {
+  const filePath = path.join(repoRoot, SHARED_CACHE_DIR, "tb2-updates", `${submissionId}.json`)
+  try {
+    return JSON.parse(await readFile(filePath, "utf8"))
+  } catch (error) {
+    if (error?.code === "ENOENT") {
+      return { version: 2, submission_id: submissionId, reviewer_cycle: 1, rubric_pending: false, iterations: [] }
+    }
+    throw new Error(`invalid update history for ${submissionId}: ${error instanceof Error ? error.message : String(error)}`)
+  }
+}
+
+async function attachHistories(repoRoot, rows) {
+  return await Promise.all(rows.map(async (row) => {
+    const history = await loadSubmissionHistory(repoRoot, row.submissionId)
+    const last = history.iterations?.at(-1) || {}
+    return {
+      ...row,
+      history,
+      previousNotes: row.previousNotes || last.notes || last.feedback?.feedback_details || "",
+      previousResult: row.previousResult || last.platform_result || "",
+    }
+  }))
 }
 
 async function writeSessionMap(filePath, sessionMap) {
@@ -407,10 +467,10 @@ async function buildRows(options) {
   if (options.reuseBatch || options.reuseSessions.length > 0) {
     const rows = buildReuseRows(priorMap, options.reuseSessions, options.retryBlocked || options.reuseSessions.length === 0)
     validateReuseRows(rows)
-    return { rows, sourceBatch: priorMap?.batch_id || options.reuseBatch || "explicit-sessions" }
+    return { rows: await attachHistories(options.repoRoot, rows), sourceBatch: priorMap?.batch_id || options.reuseBatch || "explicit-sessions" }
   }
 
-  return { rows: parseRevisionRows(runRevisionList(options.repoRoot)), sourceBatch: "" }
+  return { rows: await attachHistories(options.repoRoot, parseRevisionRows(runRevisionList(options.repoRoot))), sourceBatch: "" }
 }
 
 function validateReuseRows(rows) {
@@ -431,11 +491,23 @@ function validateReuseRows(rows) {
   }
 }
 
-function parseUpdateResult(row, sessionId, text, errorNote = "") {
-  const statusMatch = text.match(/##\s+Update Result:\s*(SUCCESS|BLOCKED|WAITING|MANUAL ACTION)/i)
+function recentLedgerAttempts(ledger, promptedAt) {
+  const attempts = ledger?.iterations?.at(-1)?.platform_attempts || []
+  const current = attempts.filter((attempt) => {
+    const started = Date.parse(attempt.started_at || "")
+    return Number.isFinite(started) && started >= promptedAt - 1000
+  })
+  return current.length > 0 ? attempts : []
+}
+
+function parseUpdateResult(row, sessionId, text, errorNote = "", ledger = null, promptedAt = 0) {
+  const statusMatch = text.match(new RegExp(`##\\s+Update Result:\\s*(${RESULT_PATTERN})`, "i"))
   const notesMatch = text.match(/^- Notes:\s*(.*)$/im)
   const platformMatch = text.match(/^- Platform update:\s*(.*)$/im)
   const attemptsMatch = text.match(/after\s+(\d+)\s+attempt/i)
+  const ledgerAttempts = recentLedgerAttempts(ledger, promptedAt)
+  const openAttempt = [...ledgerAttempts].reverse().find((attempt) => !attempt.finished_at)
+  const lastAttempt = ledgerAttempts.at(-1)
 
   const rawPlatform = platformMatch?.[1]?.toLowerCase() ?? ""
   let platformAction = "none"
@@ -447,10 +519,25 @@ function parseUpdateResult(row, sessionId, text, errorNote = "") {
     platformAction = "failed"
   }
 
-  const result = (errorNote ? "BLOCKED" : statusMatch?.[1] ?? "BLOCKED").toUpperCase()
+  let result = (statusMatch?.[1] ?? "BLOCKED").toUpperCase()
+  if (openAttempt) {
+    result = "UNKNOWN"
+    platformAction = openAttempt.mode === "checks" ? "checks (--no-send-to-reviewer)" : "reviewer"
+  } else if (lastAttempt?.outcome === "checks_submitted") {
+    result = "CHECKS SUBMITTED"
+    platformAction = "checks (--no-send-to-reviewer)"
+  } else if (lastAttempt?.outcome === "reviewer_submitted") {
+    result = "SENT TO REVIEWER"
+    platformAction = "reviewer"
+  } else if (lastAttempt?.outcome === "unknown") {
+    result = "UNKNOWN"
+    platformAction = lastAttempt.mode === "checks" ? "checks (--no-send-to-reviewer)" : "reviewer"
+  } else if (errorNote) {
+    result = "BLOCKED"
+  }
   const notes = errorNote || notesMatch?.[1] || "Could not parse updater final response; see session log."
   return {
-    attempts: attemptsMatch ? Number.parseInt(attemptsMatch[1], 10) : 0,
+    attempts: ledgerAttempts.length || (attemptsMatch ? Number.parseInt(attemptsMatch[1], 10) : 0),
     folder: row.folderName || "-",
     notes,
     platformAction,
@@ -465,9 +552,10 @@ function countSummary(results) {
   return {
     blocked: results.filter((item) => item.result === "BLOCKED").length,
     manual: results.filter((item) => item.result === "MANUAL ACTION").length,
-    reviewer: results.filter((item) => item.platformAction === "reviewer" && item.result === "SUCCESS").length,
-    checks: results.filter((item) => item.platformAction === "checks (--no-send-to-reviewer)" && item.result === "SUCCESS").length,
+    reviewer: results.filter((item) => item.result === "SENT TO REVIEWER").length,
+    checks: results.filter((item) => item.result === "CHECKS SUBMITTED").length,
     total: results.length,
+    unknown: results.filter((item) => item.result === "UNKNOWN").length,
     waiting: results.filter((item) => item.result === "WAITING").length,
   }
 }
@@ -488,11 +576,12 @@ function renderFinalTable(results) {
   lines.push(
     "",
     `- Total: ${counts.total}`,
-    `- Updated for checks: ${counts.checks}`,
+    `- Checks submitted: ${counts.checks}`,
     `- Sent to reviewer: ${counts.reviewer}`,
-    `- Manual rubric handoffs: ${counts.manual}`,
-    `- Blocked: ${counts.blocked}`,
+    `- Manual actions: ${counts.manual}`,
     `- Waiting: ${counts.waiting}`,
+    `- Blocked: ${counts.blocked}`,
+    `- Unknown: ${counts.unknown}`,
   )
   return lines.join("\n")
 }
@@ -510,7 +599,7 @@ function renderConnectionHelp(serverUrl, batchDir, progressPath, stopPath) {
     `- Session logs: \`${batchDir}\``,
     "- Exact per-session attach commands are printed when sessions launch and repeated in the live progress file.",
     "- Terminal mode redraws the dashboard in place; captured/non-TTY mode writes live progress to the file and keeps stdout compact.",
-    "- Child updater sessions are instructed not to ask questions; user-input cases should return WAITING, MANUAL ACTION, or BLOCKED.",
+    "- Child updater sessions are instructed not to ask questions and preserve WAITING, MANUAL ACTION, BLOCKED, or UNKNOWN outcomes.",
   ].join("\n")
 }
 
@@ -588,7 +677,7 @@ function renderProgress({ active, batchDir, maxWorkers, pending, results, server
     "",
     "## TB2 Update Batch",
     "",
-    `Active: ${active.size}/${maxWorkers}   Done: ${results.length}/${total}   Pending: ${pending.length}   Updated: ${counts.checks}   Reviewer: ${counts.reviewer}   Manual: ${counts.manual}   Blocked: ${counts.blocked}   Waiting: ${counts.waiting}`,
+    `Active: ${active.size}/${maxWorkers}   Done: ${results.length}/${total}   Pending: ${pending.length}   Checks submitted: ${counts.checks}   Sent to reviewer: ${counts.reviewer}   Manual: ${counts.manual}   Waiting: ${counts.waiting}   Blocked: ${counts.blocked}   Unknown: ${counts.unknown}`,
     "",
     `Attach: \`${attachCommand(serverUrl, "<session_id>")}\``,
     `Logs: \`${batchDir}\``,
@@ -630,6 +719,18 @@ async function writeSessionLog(batchDir, worker, messages, finalText) {
   const base = path.join(batchDir, `${worker.row.submissionId}-${worker.session.id}`)
   await writeFile(`${base}.txt`, finalText || "", "utf8")
   await writeFile(`${base}.json`, JSON.stringify({ row: worker.row, session: worker.session, messages }, null, 2), "utf8")
+}
+
+function persistInterruptedAttempt(repoRoot, submissionId, attemptId) {
+  const helper = path.join(repoRoot, ".opencode/scripts/tb2_update_state.py")
+  const result = spawnSync(
+    "python3",
+    [helper, "record-unknown", "--submission-id", submissionId, "--attempt-id", attemptId],
+    { cwd: repoRoot, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
+  )
+  if (result.status !== 0) {
+    throw new Error(`could not persist interrupted platform attempt: ${result.stderr || result.stdout}`)
+  }
 }
 
 async function readStopRequests(stopPath, seen) {
@@ -711,7 +812,22 @@ async function collectWorker(client, repoRoot, batchDir, worker, errorNote = "")
     errorNote = `Could not read updater session messages: ${error instanceof Error ? error.message : String(error)}`
   }
   await writeSessionLog(batchDir, worker, messages, finalText)
-  return parseUpdateResult(worker.row, worker.session.id, finalText, errorNote)
+  let ledger = await loadSubmissionHistory(repoRoot, worker.row.submissionId)
+  if (errorNote) {
+    const recentAttempts = recentLedgerAttempts(ledger, worker.promptedAt)
+    const openAttempt = [...recentAttempts].reverse().find((attempt) => !attempt.finished_at)
+    const completedAttempt = [...recentAttempts].reverse().find((attempt) => attempt.finished_at)
+    if (openAttempt?.attempt_id) {
+      persistInterruptedAttempt(repoRoot, worker.row.submissionId, openAttempt.attempt_id)
+      ledger = await loadSubmissionHistory(repoRoot, worker.row.submissionId)
+      errorNote = `Upload outcome was interrupted and recorded as UNKNOWN. ${errorNote}`
+    } else if (["checks_submitted", "reviewer_submitted"].includes(completedAttempt?.outcome)) {
+      errorNote = `Platform ledger recorded ${completedAttempt.outcome.replaceAll("_", " ")} before interruption. ${errorNote}`
+    } else {
+      errorNote = `Agent stopped before upload. ${errorNote}`
+    }
+  }
+  return parseUpdateResult(worker.row, worker.session.id, finalText, errorNote, ledger, worker.promptedAt)
 }
 
 async function launchWorker(client, repoRoot, row, constraints, slot) {
@@ -780,6 +896,8 @@ async function runBatch(options) {
   console.log(`Starting opencode SDK server on 127.0.0.1:${port}`)
   const opencode = await createOpencode({ config: { permission: "allow" }, hostname: "127.0.0.1", port, timeout: 15000 })
   const reporter = createProgressReporter(progressPath)
+  const active = new Map()
+  const results = []
   try {
     const serverUrl = opencode.server.url || `http://127.0.0.1:${port}`
     console.log(renderConnectionHelp(serverUrl, batchDir, progressPath, stopPath))
@@ -795,9 +913,7 @@ async function runBatch(options) {
     }
 
     const pending = [...rows]
-    const active = new Map()
     const freeSlots = Array.from({ length: options.maxWorkers }, (_, index) => index + 1)
-    const results = []
     const seenStopRequests = new Set()
     const timeoutMs = options.sessionTimeoutMinutes * 60 * 1000
     const progressContext = { active, batchDir, maxWorkers: options.maxWorkers, pending, results, serverUrl, stopPath, total: rows.length }
@@ -972,15 +1088,63 @@ async function runBatch(options) {
     console.log(`Session map: ${sessionsPath}`)
     console.log("")
     console.log(renderFinalTable(results))
+  } catch (error) {
+    const failure = `SDK scheduler/server failed: ${error instanceof Error ? error.message : String(error)}`
+    for (const [sessionId, worker] of [...active.entries()]) {
+      const result = await collectWorker(opencode.client, options.repoRoot, batchDir, worker, failure)
+      results.push(result)
+      updateSessionRecord(sessionMap, worker, {
+        attempts: result.attempts,
+        notes: result.notes,
+        platform_action: result.platformAction,
+        result: result.result,
+        status: "interrupted",
+      })
+      await writeSessionMap(sessionsPath, sessionMap)
+      active.delete(sessionId)
+    }
+    console.log(renderFinalTable(results))
+    throw error
   } finally {
     reporter.close()
     opencode.server.close()
   }
 }
 
-try {
-  await runBatch(parseArgs(process.argv.slice(2)))
-} catch (error) {
-  console.error(`error: ${error instanceof Error ? error.message : String(error)}`)
-  process.exit(1)
+function runSelfTests() {
+  const row = { folderName: "example", submissionId: "00000000-0000-0000-0000-000000000001" }
+  const parsedResults = []
+  for (const result of ["CHECKS SUBMITTED", "SENT TO REVIEWER", "MANUAL ACTION", "WAITING", "BLOCKED", "UNKNOWN"]) {
+    const parsed = parseUpdateResult(row, "ses_test", `## Update Result: ${result}\n\n- Notes: test`)
+    assert.equal(parsed.result, result)
+    parsedResults.push(parsed)
+  }
+  assert.deepEqual(countSummary(parsedResults), { blocked: 1, manual: 1, reviewer: 1, checks: 1, total: 6, unknown: 1, waiting: 1 })
+  assert.equal(parseUpdateResult(row, "ses_test", "## Update Result: SUCCESS").result, "BLOCKED")
+  const promptedAt = Date.now() - 1000
+  const openLedger = {
+    iterations: [{ platform_attempts: [{ attempt_id: "open", mode: "checks", started_at: new Date().toISOString(), finished_at: null }] }],
+  }
+  assert.equal(parseUpdateResult(row, "ses_test", "", "stopped", openLedger, promptedAt).result, "UNKNOWN")
+  const cumulativeLedger = {
+    iterations: [{ platform_attempts: [
+      { mode: "checks", started_at: new Date().toISOString(), finished_at: new Date().toISOString(), outcome: "transient_failure" },
+      { mode: "checks", started_at: new Date().toISOString(), finished_at: new Date().toISOString(), outcome: "checks_submitted" },
+    ] }],
+  }
+  const cumulative = parseUpdateResult(row, "ses_test", "", "", cumulativeLedger, promptedAt)
+  assert.equal(cumulative.result, "CHECKS SUBMITTED")
+  assert.equal(cumulative.attempts, 2)
+  console.log("tb2_update_batch_sdk self-tests passed")
+}
+
+if (process.env.TB2_SCHEDULER_SELF_TEST === "1" || process.argv.includes("--self-test")) {
+  runSelfTests()
+} else {
+  try {
+    await runBatch(parseArgs(process.argv.slice(2)))
+  } catch (error) {
+    console.error(`error: ${error instanceof Error ? error.message : String(error)}`)
+    process.exit(1)
+  }
 }

@@ -37,39 +37,39 @@ Core responsibilities:
 Required workflow:
 1. Validate the submission ID. If missing, return `WAITING` without running any feedback or platform command.
 2. Run `.opencode/scripts/tb2_resolve_submission_task.sh --submission-id <submission_id>`, adding `--folder-name <displayed_folder_name>` only when the caller supplied a non-empty name. Use its `task_path`. The helper first resolves the submission from local task metadata or the optional name; when no matching task is present, it downloads the submitted task into `tasks/`. If it reports multiple candidates, return `WAITING` with them; for any other failure, return `BLOCKED`. Do not ask the user from the subagent.
-3. Load and follow `tb2-feedback-iterator` from feedback fetch through repair and validation. Include the user's additional constraints in its classification; do not otherwise duplicate or override its classifications.
-4. Follow the skill's deterministic revision-note state check before treating persistent notes as new. Create a replacement rubric without requesting the current platform text when rubric work is required.
-5. Run `.opencode/scripts/tb2_task_state.sh --task tasks/<task_name> --write-cache`. Before editing, send a Markdown table with `Problem`, `Evidence`, `Planned fix`, and `Likely files`; include every concrete reviewer `Revision notes` issue from the feedback helper stdout/stderr even when it is absent from agent-log summaries, then continue automatically.
-6. Load the component skills selected by `tb2-feedback-iterator`, make every classified repair, including any major hardening it authorizes, and run their semantic gates. For `EASY` or `TRIVIAL`, do not continue to validation until `tb2-hard-task-author`'s revision hardening evidence shows a material agent-visible starting-state change rather than instruction/test/oracle-only expansion.
-7. Run task state again. For `fast-only`, run `.opencode/scripts/tb2_preflight_task.sh --context revision --task tasks/<task_name>`. For `full`, run `.opencode/scripts/tb2_validate_task.sh --context revision --task tasks/<task_name>` until it passes or a concrete blocker remains.
+3. Load and follow `tb2-feedback-iterator` from feedback fetch through history recording, classification, repair, validation, and one final action. Include the user's additional constraints; do not duplicate or override its classifications.
+4. Record mechanically extracted feedback before editing. If it is incomplete, unrefreshed, or an earlier upload is unresolved, return the skill's `WAITING` or `UNKNOWN` result without changing or uploading the task. Create a replacement rubric without requesting current platform text when rubric work is required.
+5. Run `.opencode/scripts/tb2_task_state.sh --task tasks/<task_name> --write-cache`. Before editing, send a Markdown table with `Problem`, `Evidence`, `Planned fix`, and `Likely files`; exclude ignored AutoEval noise and include every real current-cycle reviewer note, then continue automatically.
+6. Load the selected component skills and make every classified repair. For `EASY` or `TRIVIAL`, write the private iteration evidence and pass `tb2_update_state.py record-hardening` before validation. Never self-certify an instruction/test/oracle-only or unchanged hardening upload.
+7. Run task state again. For `fast-only`, run `.opencode/scripts/tb2_preflight_task.sh --context revision --task tasks/<task_name>`. For `full`, run `.opencode/scripts/tb2_validate_task.sh --context revision --task tasks/<task_name>` until it passes or a concrete blocker remains. Record the applicable validation result in the update ledger.
 8. Execute exactly the action selected by the skill:
-   - `repair-and-check`: after validation, run `.opencode/scripts/tb2_update_task.sh --task tasks/<task_name> --submission-id <submission_id>`. After success, record the current revision-note hash with the state helper.
+   - `repair-and-check`: after validation, run `.opencode/scripts/tb2_update_task.sh --task tasks/<task_name> --submission-id <submission_id>` and stop after `CHECKS SUBMITTED`.
    - `send-to-reviewer`: after fast preflight of the unchanged task, run the same helper with `--send-to-reviewer`.
    - `rubric-handoff`: write the complete replacement to `.tb2-cache/tb2-rubrics/<submission_id>.txt`, mark it pending with the state helper, and return without any platform command.
-   - `blocked`: return the evidence without a platform command.
+   - `waiting`, `blocked`, or `unknown`: return the evidence without another platform command.
 
 Hard rules:
 - Never run update if the applicable validation mode fails.
-- Never upload a hardness repair when the revision hardening gate fails or the changed files do not include a material agent-visible `environment/` change.
-- Never send to reviewer while the current feedback or task metadata still indicates `EASY` or `TRIVIAL`; harden and upload for checks instead. `Task Instruction Sufficiency: FAIL` alone is not a reviewer-handoff blocker when the task is otherwise medium/hard and clean.
+- Never upload a hardness repair when the revision hardening gate fails or the changed files do not include a material agent-visible source/runtime change.
+- Never send to reviewer unless the latest complete platform facts satisfy the skill's green-state criteria. `Task Instruction Sufficiency: FAIL` alone remains advisory.
 - Never mix modes: a repair upload uses `--no-send-to-reviewer`; a reviewer handoff omits it and must not also run a repair upload.
-- The update helper owns upload retries and stops after at most five attempts. After a successful command, stop and report; any new concern needs a later batch.
+- The update helper owns the authoritative attempt ledger and at most five transient retries per invocation. Reconcile `UNKNOWN` before any later mutation. After a submitted result, stop; fresh platform feedback belongs to a later batch.
 - Never run `stb submissions create`.
 - Do not modify unrelated tasks or workflow files.
 - Do not reinterpret feedback policy in this agent; report any unresolved classification or repair blocker.
 
-Final response must put the platform outcome and notes first. Use `SUCCESS` only after the selected update-helper mode succeeds, `BLOCKED` for validation, classification, semantic-gate, or upload failure, `WAITING` when task resolution is ambiguous, and `MANUAL ACTION` for rubric handoff. A successful hardness checks upload must say that platform difficulty reevaluation is pending; never describe the task as medium or hard before fresh platform results. Keep the summary concise and combine validation results on one line. Include `Hardening` only when requested or performed, `Instruction sufficiency` and `Alignment audit` when task files were assessed, and `Rubric` only for rubric work.
+Final response must put the platform outcome and notes first. Use only `CHECKS SUBMITTED`, `SENT TO REVIEWER`, `MANUAL ACTION`, `WAITING`, `BLOCKED`, or `UNKNOWN`; never use `SUCCESS` or `FIXED`. Keep the summary concise. A checks upload must say `Local validation passed; platform difficulty and quality reevaluation pending.` Never claim local difficulty or fresh platform success.
 
 Use this shape:
 ```text
-## Update Result: <SUCCESS|BLOCKED|WAITING|MANUAL ACTION>
+## Update Result: <CHECKS SUBMITTED|SENT TO REVIEWER|MANUAL ACTION|WAITING|BLOCKED|UNKNOWN>
 
 - Notes: <None|the blocker, required user action, or reviewer-relevant detail>
 - Submission: <submission_id>
 - Task: tasks/<task_name>|not needed for platform-only work
 
 ### Summary
-- Decision: <repair-and-check|send-to-reviewer|rubric-handoff|blocked>
+- Decision: <repair-and-check|send-to-reviewer|rubric-handoff|waiting|blocked|unknown>
 - Platform update: <checks with --no-send-to-reviewer|sent to reviewer|not attempted: reason> after <n> attempt(s)
 - Changes: <brief concrete problem -> fix summary>
 - Validation: <fast-only|full> — structural <result>, alignment <result>, metadata <result>, ruff <result>, NOP <result>, oracle <result>

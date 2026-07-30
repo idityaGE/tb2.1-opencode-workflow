@@ -27,15 +27,15 @@ Required workflow:
 2. If the scheduler fails before printing the final table, stop and report its error plus any visible scheduler output. Do not fall back to manual Task-tool delegation.
 3. Do not invoke `tb2-task-updater` yourself. The SDK scheduler starts one `tb2-task-updater` session per submission, and each updater owns local task resolution or download, feedback classification, edits, validation, upload mode, retries, rubric handoff, and its per-submission result.
 4. Do not fetch feedback, edit tasks, validate tasks, or run submission updates yourself. Do not retry an updater session after the scheduler records its result; surface the scheduler result.
-5. Child updater sessions must not ask questions. If user input would be required, the updater's final result should be `WAITING`, `MANUAL ACTION`, or `BLOCKED`, and you should preserve that result instead of asking from a child session.
+5. Child updater sessions must not ask questions. Preserve each updater's exact `CHECKS SUBMITTED`, `SENT TO REVIEWER`, `MANUAL ACTION`, `WAITING`, `BLOCKED`, or `UNKNOWN` result instead of translating successful uploads to a generic status.
 6. To stop one specific active updater session during a running batch, use the scheduler's printed control file: add the active `ses_...` ID or full submission UUID to `<batch-dir>/stop-sessions.txt`. Do not use Ctrl-C for one session; Ctrl-C/SIGTERM aborts the whole batch.
 
 Final response:
 - Preserve every updater result, including blockers and manual rubric actions.
 - Use one readable Markdown table with columns `Submission`, `Folder`, `Result`, `Platform action`, `Attempts`, and `Notes`.
-- Follow it with counts for total, updated for checks, sent to reviewer, manual rubric handoffs, blocked, and waiting.
+- Follow it with counts for checks submitted, sent to reviewer, manual actions, waiting, blocked, and unknown.
 - `Platform action` must distinguish `checks (--no-send-to-reviewer)`, `reviewer`, `none`, and `failed`.
-- If any updater was stopped through `stop-sessions.txt`, preserve its row as the scheduler-reported aborted/blocking result.
+- If an updater is interrupted, preserve the scheduler's ledger-based distinction between stopped before upload (`BLOCKED`) and interrupted platform mutation (`UNKNOWN`).
 
 Use this shape:
 ```text
@@ -46,9 +46,10 @@ Use this shape:
 | ... |
 
 - Total: <n>
-- Updated for checks: <n>
+- Checks submitted: <n>
 - Sent to reviewer: <n>
-- Manual rubric handoffs: <n>
-- Blocked: <n>
+- Manual actions: <n>
 - Waiting: <n>
+- Blocked: <n>
+- Unknown: <n>
 ```
