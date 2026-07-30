@@ -39,6 +39,41 @@ Verifier Alignment: {other_quality}
 """
 
 
+def platform_feedback_text(
+    difficulty: str = "TRIVIAL",
+    status: str = "✅ Solvable (all tests passed by at least one agent run)",
+    passed: int = 10,
+    instruction: str = "NOT_APPLICABLE",
+    quality: str = "pass",
+) -> str:
+    return f"""Revision Notes
+--------------------------------------------------------------------------------
+AutoEval Execution Summary: AutoEval execution failed. Build status: FAILED. Build ID: CodeExecutionEnvironment:example.
+
+Summary (difficulty check)
+--------------------------------------------------------------------------------
+Difficulty: ❌ {difficulty} - Requires at least MEDIUM
+
+Status: {status}
+
+Agent Performance:
+  • terminus-claude-opus-4-8: 100.0% (5/5 runs)
+  • terminus-gpt5-5: 80.0% (4/5 runs)
+
+Unit Tests Results:
+  • test_recovery: {passed} passed / 10 runs
+
+Analysis on Agent Failures:
+  • Task Instruction Sufficiency: ➖ {instruction}, debug output not available
+
+Quality check summary
+--------------------------------------------------------------------------------
+## Quality Check Results
+✅ {quality} - behavior_in_task_description: concrete details
+✅ pass - behavior_in_tests: concrete details
+"""
+
+
 class FeedbackExtractionTests(unittest.TestCase):
     def extract(self, text: str) -> dict:
         with tempfile.TemporaryDirectory() as directory:
@@ -84,6 +119,30 @@ class FeedbackExtractionTests(unittest.TestCase):
     def test_other_quality_failure_requires_checks(self):
         facts = self.extract(feedback_text(difficulty="HARD", other_quality="FAIL"))
         self.assertEqual(facts["quality_failures"], ["Verifier Alignment"])
+
+    def test_real_platform_format_is_complete(self):
+        facts = self.extract(platform_feedback_text())
+        self.assertEqual(facts["revision_notes"], "")
+        self.assertEqual(facts["difficulty"], "TRIVIAL")
+        self.assertEqual(facts["solvability"], "SOLVABLE")
+        self.assertEqual(facts["frontier_test_pass_counts"], {"test_recovery": "10/10"})
+        self.assertEqual(facts["instruction_sufficiency"], "NOT_APPLICABLE")
+        self.assertEqual(facts["quality_failures"], [])
+        self.assertEqual(facts["agent_performance"], {"claude": "5/5", "gpt": "4/5"})
+        self.assertTrue(facts["feedback_complete"])
+
+    def test_real_platform_zero_pass_is_non_solvable(self):
+        facts = self.extract(
+            platform_feedback_text(
+                status="❌ Some tests not passed by any agent run", passed=0
+            )
+        )
+        self.assertEqual(facts["solvability"], "NOT_SOLVABLE")
+        self.assertEqual(facts["zero_pass_tests"], ["test_recovery"])
+
+    def test_real_platform_quality_failure_requires_checks(self):
+        facts = self.extract(platform_feedback_text(difficulty="HARD", quality="fail"))
+        self.assertEqual(facts["quality_failures"], ["behavior_in_task_description"])
 
 
 class HistoryTests(unittest.TestCase):

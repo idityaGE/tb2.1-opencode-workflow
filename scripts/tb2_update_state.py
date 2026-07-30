@@ -23,10 +23,17 @@ AUTOEVAL_RE = re.compile(
 UUID_RE = re.compile(r"^[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$")
 LOW_DIFFICULTIES = {"EASY", "TRIVIAL"}
 QUALITY_OUTCOME_RE = re.compile(
-    r"^\s*(?:[-*]\s*)?([^:\n]+?):\s*(PASS|FAIL|FAILED|NOT_APPLICABLE|NOT APPLICABLE|N/?A)\b",
+    r"^\s*(?:[-*•]\s*)?([^:\n]+?):\s*[^A-Z\n]*(PASS|FAIL|FAILED|NOT_APPLICABLE|NOT APPLICABLE|N/?A)\b",
     re.IGNORECASE,
 )
-TEST_COUNT_RE = re.compile(r"^\s*(?:[-*]\s*)?([^:\n]+?):\s*(\d+)\s*/\s*(\d+)\b")
+QUALITY_RESULT_RE = re.compile(
+    r"^\s*[^A-Za-z\n]*(PASS|FAIL|FAILED|NOT_APPLICABLE|NOT APPLICABLE|N/?A)\s+-\s+([^:\n]+):",
+    re.IGNORECASE,
+)
+TEST_COUNT_RE = re.compile(
+    r"^\s*(?:[-*•]\s*)?([^:\n]+?):\s*(\d+)(?:\s+passed)?\s*/\s*(\d+)(?:\s+runs?)?\b",
+    re.IGNORECASE,
+)
 EXCLUDED_NAMES = {".snorkel_config", ".DS_Store"}
 EXCLUDED_PARTS = {"__pycache__", ".pytest_cache", ".ruff_cache", ".git"}
 EXCLUDED_SUFFIXES = {".pyc", ".pyo", ".zip", ".tmp", ".temp", ".swp"}
@@ -173,7 +180,7 @@ def feedback_texts(feedback_dir: Path) -> dict[str, str]:
 
 def extract_difficulty(text: str) -> str | None:
     patterns = [
-        r"\b(?:task\s+)?difficulty\s*(?:rating|result|status)?\s*[:=-]\s*(TRIVIAL|EASY|MEDIUM|HARD)\b",
+        r"\b(?:task\s+)?difficulty\s*(?:rating|result|status)?\s*[:=-]\s*[^A-Za-z\n]*(TRIVIAL|EASY|MEDIUM|HARD)\b",
         r"\b(?:rated|classified)\s+(?:as\s+)?(TRIVIAL|EASY|MEDIUM|HARD)\b",
     ]
     for pattern in patterns:
@@ -185,34 +192,20 @@ def extract_difficulty(text: str) -> str | None:
 
 def extract_solvability(text: str) -> str | None:
     match = re.search(
-        r"\b(?:solvability|solvable\s+status|task\s+status)\s*[:=-]\s*(NOT[_ -]?SOLVABLE|UNSOLVABLE|SOLVABLE)\b",
+        r"\b(?:solvability|solvable\s+status|task\s+status|status)\s*[:=-]\s*[^A-Za-z\n]*(NOT[_ -]?SOLVABLE|UNSOLVABLE|SOLVABLE)\b",
         text,
         re.IGNORECASE,
     )
     if match:
         value = match.group(1).upper().replace(" ", "_").replace("-", "_")
         return "NOT_SOLVABLE" if value == "UNSOLVABLE" else value
-    if re.search(r"\bnon-solvable\b|\bnot solvable\b", text, re.IGNORECASE):
+    if re.search(
+        r"\bnon-solvable\b|\bnot solvable\b|Status:\s*[^\n]*Some tests not passed by any agent run",
+        text,
+        re.IGNORECASE,
+    ):
         return "NOT_SOLVABLE"
     return None
-
-
-def section_lines(text: str, heading_pattern: str) -> list[str]:
-    lines = text.splitlines()
-    collecting = False
-    kept: list[str] = []
-    for line in lines:
-        stripped = line.strip()
-        if not collecting:
-            if re.search(heading_pattern, stripped, re.IGNORECASE):
-                collecting = True
-            continue
-        if stripped.startswith("#") and kept:
-            break
-        if re.match(r"^[A-Z][A-Za-z ()/-]+:$", stripped) and kept:
-            break
-        kept.append(line)
-    return kept
 
 
 def extract_test_counts(text: str) -> tuple[dict[str, str], list[str]]:
@@ -235,25 +228,21 @@ def extract_test_counts(text: str) -> tuple[dict[str, str], list[str]]:
 
 
 def extract_quality(text: str) -> tuple[dict[str, str], list[str], str | None]:
-    lines = section_lines(text, r"quality(?:\s+check)?(?:\s+summary|\s+results)?")
     outcomes: dict[str, str] = {}
-    for line in lines:
-        match = QUALITY_OUTCOME_RE.match(line)
-        if not match:
+    for line in text.splitlines():
+        outcome_match = QUALITY_OUTCOME_RE.match(line)
+        if outcome_match:
+            name = " ".join(outcome_match.group(1).split()).strip("-*• ")
+            outcomes[name] = outcome_match.group(2)
             continue
-        name = " ".join(match.group(1).split()).strip("-* ")
-        value = match.group(2).upper().replace(" ", "_").replace("FAILED", "FAIL")
+        match = QUALITY_RESULT_RE.match(line)
+        if match:
+            outcomes[" ".join(match.group(2).split()).strip("-* ")] = match.group(1)
+    for name, raw_value in list(outcomes.items()):
+        value = raw_value.upper().replace(" ", "_").replace("FAILED", "FAIL")
         value = "NOT_APPLICABLE" if value in {"N/A", "NA", "NOT_APPLICABLE"} else value
         outcomes[name] = value
-    instruction_key = next(
-        (
-            name
-            for name in outcomes
-            if name.casefold() == "task instruction sufficiency"
-        ),
-        None,
-    )
-    instruction = outcomes.get(instruction_key) if instruction_key else None
+    instruction = outcomes.get("Task Instruction Sufficiency")
     failures = sorted(
         name
         for name, value in outcomes.items()
@@ -265,7 +254,13 @@ def extract_quality(text: str) -> tuple[dict[str, str], list[str], str | None]:
 def extract_agent_performance(text: str) -> dict[str, str]:
     performance: dict[str, str] = {}
     for agent in ("claude", "gpt"):
-        match = re.search(rf"\b{agent}\b[^\n:]*[:=-]\s*(\d+)\s*/\s*(\d+)", text, re.I)
+        match = re.search(
+            rf"\b{agent}[^\n]*?\((\d+)\s*/\s*(\d+)\s+runs?\)", text, re.I
+        )
+        if not match:
+            match = re.search(
+                rf"\b{agent}[^\n:]*[:=-]\s*(\d+)\s*/\s*(\d+)", text, re.I
+            )
         if match:
             performance[agent] = f"{match.group(1)}/{match.group(2)}"
     return performance

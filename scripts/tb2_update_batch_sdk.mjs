@@ -408,7 +408,7 @@ async function writeSessionMap(filePath, sessionMap) {
 }
 
 function resultIsRetryable(result) {
-  return String(result || "").toUpperCase() === "BLOCKED"
+  return ["BLOCKED", "WAITING", "UNKNOWN"].includes(String(result || "").toUpperCase())
 }
 
 function rowFromSessionEntry(submissionId, entry) {
@@ -1121,6 +1121,10 @@ function runSelfTests() {
   }
   assert.deepEqual(countSummary(parsedResults), { blocked: 1, manual: 1, reviewer: 1, checks: 1, total: 6, unknown: 1, waiting: 1 })
   assert.equal(parseUpdateResult(row, "ses_test", "## Update Result: SUCCESS").result, "BLOCKED")
+  assert.equal(resultIsRetryable("BLOCKED"), true)
+  assert.equal(resultIsRetryable("WAITING"), true)
+  assert.equal(resultIsRetryable("UNKNOWN"), true)
+  assert.equal(resultIsRetryable("CHECKS SUBMITTED"), false)
   const promptedAt = Date.now() - 1000
   const openLedger = {
     iterations: [{ platform_attempts: [{ attempt_id: "open", mode: "checks", started_at: new Date().toISOString(), finished_at: null }] }],

@@ -3,7 +3,6 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[3]
 KILO = ROOT / ".kilo"
 
@@ -46,6 +45,14 @@ class KiloSyncTests(unittest.TestCase):
         self.assertNotIn(".opencode/scripts/tb2_update_state.py", scheduler)
         self.assertIn("@kilocode/sdk", scheduler)
         self.assertIn("createKilo", scheduler)
+
+    def test_task_validation_ruff_is_task_scoped(self):
+        for workflow in (ROOT / ".opencode", KILO):
+            validator = (workflow / "scripts/tb2_validate_task.sh").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn('tb2_run_platform_ruff "$task_path"', validator)
+            self.assertNotIn('ruff check --extend-select I "$SCRIPT_DIR"', validator)
 
 
 if __name__ == "__main__":

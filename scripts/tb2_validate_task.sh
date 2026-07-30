@@ -116,7 +116,6 @@ python3 "$SCRIPT_DIR/tb2_task_lint.py" --context "$context" "$task_path"
 
 printf '\n== Ruff verifier/helper check ==\n'
 tb2_require_ruff
-ruff check --extend-select I "$SCRIPT_DIR"
 tb2_run_platform_ruff "$task_path"
 tb2_run_advisory_ruff "$task_path"
 
