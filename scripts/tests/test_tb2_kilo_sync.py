@@ -48,11 +48,12 @@ class KiloSyncTests(unittest.TestCase):
 
     def test_task_validation_ruff_is_task_scoped(self):
         for workflow in (ROOT / ".opencode", KILO):
-            validator = (workflow / "scripts/tb2_validate_task.sh").read_text(
-                encoding="utf-8"
-            )
-            self.assertIn('tb2_run_platform_ruff "$task_path"', validator)
-            self.assertNotIn('ruff check --extend-select I "$SCRIPT_DIR"', validator)
+            for script_name in ("tb2_preflight_task.sh", "tb2_validate_task.sh"):
+                validator = (workflow / f"scripts/{script_name}").read_text(
+                    encoding="utf-8"
+                )
+                self.assertIn('tb2_run_platform_ruff "$task_path"', validator)
+                self.assertNotIn('ruff check --extend-select I "$SCRIPT_DIR"', validator)
 
 
 if __name__ == "__main__":
